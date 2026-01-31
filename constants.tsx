@@ -2,13 +2,13 @@
 import { RoomStatus, RoomType, Room } from './types';
 
 export const STATUS_COLORS: Record<RoomStatus, string> = {
-  [RoomStatus.VACANT]: 'bg-white border-green-400 text-green-900',
-  [RoomStatus.OCCUPIED]: 'bg-blue-50 border-blue-600 text-blue-900 shadow-inner',
-  [RoomStatus.RESERVED]: 'bg-orange-50 border-orange-500 text-orange-900',
-  [RoomStatus.DIRTY]: 'bg-red-50 border-red-500 text-red-900',
-  [RoomStatus.REPAIR]: 'bg-[#5c2d0a]/10 border-[#5c2d0a] text-[#5c2d0a]', // Brown as requested
-  [RoomStatus.MANAGEMENT]: 'bg-purple-50 border-purple-400 text-purple-900',
-  [RoomStatus.STAFF_BLOCK]: 'bg-gray-300 border-gray-500 text-gray-800',
+  [RoomStatus.VACANT]: 'bg-white border-emerald-200 text-emerald-900 shadow-sm',
+  [RoomStatus.OCCUPIED]: 'bg-indigo-50/50 border-indigo-500 text-indigo-900 shadow-sm',
+  [RoomStatus.RESERVED]: 'bg-orange-50/50 border-orange-400 text-orange-900 shadow-sm',
+  [RoomStatus.DIRTY]: 'bg-rose-50/50 border-rose-400 text-rose-900 shadow-sm',
+  [RoomStatus.REPAIR]: 'bg-[#5c2d0a]/10 border-[#5c2d0a] text-[#5c2d0a] shadow-sm', 
+  [RoomStatus.MANAGEMENT]: 'bg-violet-50 border-violet-400 text-violet-900 shadow-sm',
+  [RoomStatus.STAFF_BLOCK]: 'bg-slate-800 border-slate-900 text-white shadow-sm',
 };
 
 export const INDIAN_STATES = [

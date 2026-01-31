@@ -1,5 +1,4 @@
 
-
 export enum RoomStatus {
   VACANT = 'VACANT',
   OCCUPIED = 'OCCUPIED',
@@ -36,6 +35,21 @@ export interface Supervisor {
   assignedRoomIds: string[];
   status: 'ACTIVE' | 'INACTIVE';
   lastActive?: string;
+  baseSalary?: number;
+  phone?: string;
+}
+
+export interface PayrollRecord {
+  id: string;
+  staffId: string;
+  month: string; // e.g., "2023-10"
+  baseSalary: number;
+  allowances: number;
+  deductions: number;
+  netSalary: number;
+  status: 'PENDING' | 'PAID';
+  paymentDate?: string;
+  paymentMethod?: string;
 }
 
 export interface Occupant {
@@ -71,7 +85,6 @@ export interface Guest {
   dob?: string;
   country?: string;
   gender?: 'Male' | 'Female' | 'Other';
-  /* Fix: Added missing properties for international travel and Form-C compliance */
   passportNo?: string;
   passportPlaceOfIssue?: string;
   passportDateOfIssue?: string;
@@ -91,7 +104,7 @@ export interface BanquetHall {
   type: 'HALL' | 'LAWN';
 }
 
-export type EventType = 'Corporate' | 'Marriage' | 'Ceremony' | 'Other';
+export type EventType = 'Corporate' | 'Marriage' | 'Ceremony' | 'Birthday' | 'Social' | 'Other';
 
 export interface CateringIngredient {
   name: string;
@@ -131,6 +144,10 @@ export interface EventBooking {
   status: 'CONFIRMED' | 'TENTATIVE' | 'CANCELLED' | 'COMPLETED' | 'SETTLED';
   catering?: EventCatering;
   guestCount: number;
+  decorationCharge: number;
+  lightingCharge: number;
+  musicCharge: number;
+  otherCharges: number;
 }
 
 export interface RestaurantOutlet {
@@ -291,6 +308,7 @@ export interface Room {
   floor: number;
   block?: string;
   type: string;
+  bedType?: 'Single' | 'Double';
   price: number;
   status: RoomStatus;
   currentBookingId?: string;
@@ -346,7 +364,9 @@ export interface HostelSettings {
   address: string;
   agents: AgentConfig[];
   roomTypes: string[];
+  mealPlans?: string[];
   blocks?: string[];
+  floors?: number[];
   gstNumber?: string;
   taxRate?: number;
   cgstRate?: number;
@@ -360,7 +380,6 @@ export interface HostelSettings {
   supervisorPassword?: string;
   logo?: string;
   signature?: string;
-  // NEW FIELDS
   wifiPassword?: string;
   receptionPhone?: string;
   roomServicePhone?: string;

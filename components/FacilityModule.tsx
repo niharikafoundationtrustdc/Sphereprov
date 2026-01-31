@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/db';
 import { Facility, FacilityUsage, Guest, Booking, Room, Transaction } from '../types';
@@ -11,6 +12,7 @@ interface FacilityPackage {
 }
 
 interface FacilityConfig {
+  id: string;
   gymMenHours: string;
   gymWomenHours: string;
   poolMenHours: string;
@@ -45,7 +47,7 @@ const FacilityModule: React.FC<FacilityModuleProps> = ({ guests, bookings, rooms
   const [guestSearch, setGuestSearch] = useState('');
   const [guestType, setGuestType] = useState<'RESIDENT' | 'OUTSIDER'>('RESIDENT');
   
-  const [config, setConfig] = useState<FacilityConfig>({
+  const [config, setConfig] = useState<Omit<FacilityConfig, 'id'>>({
     gymMenHours: '06:00 AM - 10:00 AM | 06:00 PM - 10:00 PM',
     gymWomenHours: '10:00 AM - 01:00 PM | 03:00 PM - 06:00 PM',
     poolMenHours: '06:00 AM - 10:00 AM | 06:00 PM - 10:00 PM',
@@ -53,7 +55,6 @@ const FacilityModule: React.FC<FacilityModuleProps> = ({ guests, bookings, rooms
   });
 
   const [editingPkg, setEditingPkg] = useState<Partial<FacilityPackage> | null>(null);
-  
   const [laundryCart, setLaundryCart] = useState<{pkgId: string, name: string, price: number, qty: number}[]>([]);
 
   const [formData, setFormData] = useState({
@@ -74,16 +75,20 @@ const FacilityModule: React.FC<FacilityModuleProps> = ({ guests, bookings, rooms
   useEffect(() => {
     const init = async () => {
        setUsage(await db.facilityUsage.toArray());
-       const savedConfig = await db.settings.get('facility_config' as any);
-       if (savedConfig) setConfig(savedConfig as any);
        
-       let savedPkgs = await db.settings.get('facility_packages' as any);
-       if (savedPkgs && Array.isArray(savedPkgs)) {
-         setPackages(savedPkgs as any);
+       // Load config with internal ID
+       const savedConfigObj = await db.settings.get('facility_config');
+       if (savedConfigObj && (savedConfigObj as any).config) {
+         setConfig((savedConfigObj as any).config);
+       }
+       
+       // Load packages with internal ID
+       const savedPkgsObj = await db.settings.get('facility_packages');
+       if (savedPkgsObj && (savedPkgsObj as any).list) {
+         setPackages((savedPkgsObj as any).list);
        } else {
          setPackages(INITIAL_PACKAGES);
-         /* Fix: Type mismatch - using settings table as generic store, casting to any */
-         await db.settings.put(INITIAL_PACKAGES as any, 'facility_packages' as any);
+         await db.settings.put({ id: 'facility_packages', list: INITIAL_PACKAGES } as any);
        }
     };
     init();
@@ -103,7 +108,7 @@ const FacilityModule: React.FC<FacilityModuleProps> = ({ guests, bookings, rooms
   }, [usage]);
 
   const handleUpdateConfig = async () => {
-     await db.settings.put({ ...config, id: 'facility_config' } as any);
+     await db.settings.put({ id: 'facility_config', config } as any);
      alert("Facility timings updated!");
   };
 
@@ -122,8 +127,7 @@ const FacilityModule: React.FC<FacilityModuleProps> = ({ guests, bookings, rooms
     }
     
     setPackages(updated);
-    /* Fix: Type mismatch - using settings table as generic store, casting to any */
-    await db.settings.put(updated as any, 'facility_packages' as any);
+    await db.settings.put({ id: 'facility_packages', list: updated } as any);
     setEditingPkg(null);
     alert("Facility service updated successfully!");
   };
@@ -132,8 +136,7 @@ const FacilityModule: React.FC<FacilityModuleProps> = ({ guests, bookings, rooms
     if (!confirm("Permanently remove this service?")) return;
     const updated = packages.filter(p => p.id !== id);
     setPackages(updated);
-    /* Fix: Type mismatch - using settings table as generic store, casting to any */
-    await db.settings.put(updated as any, 'facility_packages' as any);
+    await db.settings.put({ id: 'facility_packages', list: updated } as any);
   };
 
   const filteredGuests = useMemo(() => {
@@ -175,7 +178,6 @@ const FacilityModule: React.FC<FacilityModuleProps> = ({ guests, bookings, rooms
       startTime: new Date().toISOString(),
       amount: finalAmount,
       isBilledToRoom: guestType === 'RESIDENT' && formData.assignToRoom,
-      // @ts-ignore
       outsiderInfo: guestType === 'OUTSIDER' ? { name: formData.outsiderName, phone: formData.outsiderPhone, email: formData.outsiderEmail } : undefined,
       items: activeTab === 'LAUNDRY' ? laundryCart.map(c => ({ name: c.name, qty: c.qty, price: c.price })) : undefined
     };

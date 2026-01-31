@@ -15,27 +15,32 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
-  settings, setSettings, rooms, setRooms, setBookings, setTransactions,
-  supervisors, setSupervisors
+  settings, setSettings, rooms, setRooms, supervisors, setSupervisors
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'GENERAL' | 'ROOMS' | 'STAFF' | 'DATA' | 'TAX' | 'GUEST_PORTAL'>('GENERAL');
   const [tempSettings, setTempSettings] = useState<HostelSettings>(settings);
   
   const [newRoom, setNewRoom] = useState<Partial<Room>>({ 
     number: '', 
-    floor: 1, 
+    floor: settings.floors?.[0] || 1, 
     block: settings.blocks?.[0] || 'Main',
-    type: settings.roomTypes[0] || '', 
+    type: settings.roomTypes?.[0] || '', 
+    bedType: 'Single',
     price: 0 
   });
   
   const [newRoomType, setNewRoomType] = useState('');
   const [newBlockName, setNewBlockName] = useState('');
+  const [newFloor, setNewFloor] = useState<string>('');
+  const [newMealPlan, setNewMealPlan] = useState('');
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [newStaff, setNewStaff] = useState<Partial<Supervisor>>({ name: '', loginId: '', password: 'admin', role: 'SUPERVISOR', assignedRoomIds: [], status: 'ACTIVE' });
 
   useEffect(() => {
     setTempSettings(settings);
+    if (!newRoom.type && settings.roomTypes?.[0]) {
+      setNewRoom(prev => ({ ...prev, type: settings.roomTypes[0] }));
+    }
   }, [settings]);
 
   const handleUpdate = (field: keyof HostelSettings, value: any) => {
@@ -96,6 +101,23 @@ const Settings: React.FC<SettingsProps> = ({
     setNewBlockName('');
   };
 
+  const addFloor = () => {
+    const fNum = parseInt(newFloor);
+    if (isNaN(fNum)) return;
+    const currentFloors = tempSettings.floors || [1, 2, 3];
+    if (currentFloors.includes(fNum)) return;
+    const updatedFloors = [...currentFloors, fNum].sort((a, b) => a - b);
+    handleUpdate('floors', updatedFloors);
+    setNewFloor('');
+  };
+
+  const addMealPlan = () => {
+    if (!newMealPlan) return;
+    const updatedPlans = [...(tempSettings.mealPlans || []), newMealPlan];
+    handleUpdate('mealPlans', updatedPlans);
+    setNewMealPlan('');
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -122,11 +144,11 @@ const Settings: React.FC<SettingsProps> = ({
         {activeSubTab === 'GENERAL' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 animate-in fade-in duration-500">
             <section className="lg:col-span-2 bg-white p-6 md:p-10 rounded-3xl md:rounded-[3rem] border shadow-sm space-y-6 md:space-y-8">
-              <h3 className="font-black uppercase text-xs tracking-widest border-b pb-4 md:pb-6 text-blue-900">Property Identity</h3>
+              <h3 className="font-black uppercase text-xs tracking-widest border-b pb-4 md:pb-6 text-orange-900">Property Identity</h3>
               <Input label="Business Name" value={tempSettings.name} onChange={v => handleUpdate('name', v)} />
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Full Postal Address</label>
-                <textarea className="w-full border-2 p-4 rounded-2xl font-bold h-24 bg-slate-50 focus:bg-white focus:border-blue-500 outline-none transition-all resize-none text-xs" value={tempSettings.address} onChange={e => handleUpdate('address', e.target.value)} />
+                <textarea className="w-full border-2 p-4 rounded-2xl font-bold h-24 bg-slate-50 focus:bg-white focus:border-orange-500 outline-none transition-all resize-none text-xs" value={tempSettings.address} onChange={e => handleUpdate('address', e.target.value)} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                  <Input label="Reception Phone" value={tempSettings.receptionPhone || ''} onChange={v => handleUpdate('receptionPhone', v)} />
@@ -136,7 +158,7 @@ const Settings: React.FC<SettingsProps> = ({
             </section>
 
             <section className="bg-white p-6 md:p-10 rounded-3xl border shadow-sm space-y-6 h-fit">
-               <h3 className="font-black uppercase text-xs tracking-widest border-b pb-4 text-blue-900">Brand Assets</h3>
+               <h3 className="font-black uppercase text-xs tracking-widest border-b pb-4 text-orange-900">Brand Assets</h3>
                 <div className="space-y-3">
                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Logo</label>
                    <div className="h-24 bg-slate-50 border-2 border-dashed rounded-3xl flex items-center justify-center relative group overflow-hidden">
@@ -157,17 +179,17 @@ const Settings: React.FC<SettingsProps> = ({
 
         {activeSubTab === 'ROOMS' && (
           <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 {/* ROOM TYPE MANAGER */}
                 <section className="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
-                   <h3 className="font-black uppercase text-xs text-blue-900 tracking-widest border-b pb-4">Manage Room Types</h3>
+                   <h3 className="font-black uppercase text-xs text-orange-900 tracking-widest border-b pb-4">Manage Room Types</h3>
                    <div className="flex gap-2">
-                      <input className="flex-1 border-2 p-3 rounded-xl font-bold text-xs bg-slate-50 outline-none focus:border-blue-500 text-black" placeholder="New Type (e.g. AC SUITE)" value={newRoomType} onChange={e => setNewRoomType(e.target.value)} />
-                      <button onClick={addRoomType} className="bg-blue-600 text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-black transition-all">Create</button>
+                      <input className="flex-1 border-2 p-3 rounded-xl font-bold text-xs bg-slate-50 outline-none focus:border-orange-500 text-black" placeholder="New Type (e.g. AC SUITE)" value={newRoomType} onChange={e => setNewRoomType(e.target.value)} />
+                      <button onClick={addRoomType} className="bg-orange-600 text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-black transition-all">Create</button>
                    </div>
-                   <div className="flex flex-wrap gap-2 mt-4 max-h-40 overflow-y-auto">
+                   <div className="flex flex-wrap gap-2 mt-4 max-h-40 overflow-y-auto custom-scrollbar">
                       {(tempSettings.roomTypes || []).map(t => (
-                        <div key={t} className="flex items-center gap-2 bg-blue-50 text-blue-900 px-4 py-2 rounded-xl font-black text-[10px] uppercase border border-blue-100">
+                        <div key={t} className="flex items-center gap-2 bg-orange-50 text-orange-900 px-4 py-2 rounded-xl font-black text-[10px] uppercase border border-orange-100">
                           {t}
                           <button onClick={() => handleUpdate('roomTypes', tempSettings.roomTypes.filter(x => x !== t))} className="hover:text-red-600 font-bold ml-1">×</button>
                         </div>
@@ -177,12 +199,12 @@ const Settings: React.FC<SettingsProps> = ({
 
                 {/* BLOCK MANAGER */}
                 <section className="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
-                   <h3 className="font-black uppercase text-xs text-blue-900 tracking-widest border-b pb-4">Manage Blocks / Wings</h3>
+                   <h3 className="font-black uppercase text-xs text-orange-900 tracking-widest border-b pb-4">Manage Blocks</h3>
                    <div className="flex gap-2">
-                      <input className="flex-1 border-2 p-3 rounded-xl font-bold text-xs bg-slate-50 outline-none focus:border-blue-500 text-black" placeholder="New Block (e.g. WING B)" value={newBlockName} onChange={e => setNewBlockName(e.target.value)} />
-                      <button onClick={addBlock} className="bg-blue-600 text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-black transition-all">Create</button>
+                      <input className="flex-1 border-2 p-3 rounded-xl font-bold text-xs bg-slate-50 outline-none focus:border-orange-500 text-black" placeholder="New Block (e.g. WING B)" value={newBlockName} onChange={e => setNewBlockName(e.target.value)} />
+                      <button onClick={addBlock} className="bg-orange-600 text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-black transition-all">Create</button>
                    </div>
-                   <div className="flex flex-wrap gap-2 mt-4 max-h-40 overflow-y-auto">
+                   <div className="flex flex-wrap gap-2 mt-4 max-h-40 overflow-y-auto custom-scrollbar">
                       {(tempSettings.blocks || []).map(b => (
                         <div key={b} className="flex items-center gap-2 bg-emerald-50 text-emerald-900 px-4 py-2 rounded-xl font-black text-[10px] uppercase border border-emerald-100">
                           {b}
@@ -191,12 +213,53 @@ const Settings: React.FC<SettingsProps> = ({
                       ))}
                    </div>
                 </section>
+
+                {/* FLOOR MANAGER */}
+                <section className="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
+                   <h3 className="font-black uppercase text-xs text-orange-900 tracking-widest border-b pb-4">Manage Floors</h3>
+                   <div className="flex gap-2">
+                      <input type="number" className="flex-1 border-2 p-3 rounded-xl font-bold text-xs bg-slate-50 outline-none focus:border-orange-500 text-black" placeholder="Floor No" value={newFloor} onChange={e => setNewFloor(e.target.value)} />
+                      <button onClick={addFloor} className="bg-orange-600 text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-black transition-all">Add</button>
+                   </div>
+                   <div className="flex flex-wrap gap-2 mt-4 max-h-40 overflow-y-auto custom-scrollbar">
+                      {(tempSettings.floors || [1, 2, 3]).map(f => (
+                        <div key={f} className="flex items-center gap-2 bg-slate-100 text-slate-800 px-4 py-2 rounded-xl font-black text-[10px] uppercase border border-slate-200">
+                          Level {f}
+                          <button onClick={() => handleUpdate('floors', (tempSettings.floors || [1, 2, 3]).filter(x => x !== f))} className="hover:text-red-600 font-bold ml-1">×</button>
+                        </div>
+                      ))}
+                   </div>
+                </section>
+
+                {/* MEAL PLAN MANAGER */}
+                <section className="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
+                   <h3 className="font-black uppercase text-xs text-orange-900 tracking-widest border-b pb-4">Meal Plans</h3>
+                   <div className="flex gap-2">
+                      <input className="flex-1 border-2 p-3 rounded-xl font-bold text-xs bg-slate-50 outline-none focus:border-orange-500 text-black" placeholder="Plan (e.g. CP)" value={newMealPlan} onChange={e => setNewMealPlan(e.target.value)} />
+                      <button onClick={addMealPlan} className="bg-orange-600 text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-black transition-all">Add</button>
+                   </div>
+                   <div className="flex flex-wrap gap-2 mt-4 max-h-40 overflow-y-auto custom-scrollbar">
+                      {(tempSettings.mealPlans || ['EP', 'CP', 'MAP', 'AP']).map(mp => (
+                        <div key={mp} className="flex items-center gap-2 bg-blue-50 text-blue-900 px-4 py-2 rounded-xl font-black text-[10px] uppercase border border-blue-100">
+                          {mp}
+                          <button onClick={() => handleUpdate('mealPlans', (tempSettings.mealPlans || ['EP', 'CP', 'MAP', 'AP']).filter(x => x !== mp))} className="hover:text-red-600 font-bold ml-1">×</button>
+                        </div>
+                      ))}
+                   </div>
+                </section>
              </div>
 
              <section className="bg-white p-6 md:p-10 rounded-3xl border shadow-sm space-y-6">
-                <h3 className="font-black uppercase text-xs text-blue-900 tracking-widest border-b pb-4">New Room Entry</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-6 gap-6 items-end">
+                <h3 className="font-black uppercase text-xs text-orange-900 tracking-widest border-b pb-4">New Room Entry</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-7 gap-4 items-end">
                    <Input label="Room No" value={newRoom.number} onChange={v => setNewRoom({...newRoom, number: v})} />
+                   <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Bed Type</label>
+                      <select className="w-full border-2 p-3.5 rounded-2xl font-black text-[11px] bg-slate-50 outline-none" value={newRoom.bedType} onChange={e => setNewRoom({...newRoom, bedType: e.target.value as any})}>
+                         <option value="Single">Single Bed</option>
+                         <option value="Double">Double Bed</option>
+                      </select>
+                   </div>
                    <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Category</label>
                       <select className="w-full border-2 p-3.5 rounded-2xl font-black text-[11px] bg-slate-50 outline-none" value={newRoom.type} onChange={e => setNewRoom({...newRoom, type: e.target.value})}>
@@ -209,18 +272,25 @@ const Settings: React.FC<SettingsProps> = ({
                          {(tempSettings.blocks || ['Main']).map(b => <option key={b} value={b}>{b}</option>)}
                       </select>
                    </div>
+                   <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Floor</label>
+                      <select className="w-full border-2 p-3.5 rounded-2xl font-black text-[11px] bg-slate-50 outline-none" value={newRoom.floor} onChange={e => setNewRoom({...newRoom, floor: parseInt(e.target.value)})}>
+                         {(tempSettings.floors || [1, 2, 3]).map(f => <option key={f} value={f}>Level {f}</option>)}
+                      </select>
+                   </div>
                    <Input label="Rate (₹)" type="number" value={newRoom.price} onChange={v => setNewRoom({...newRoom, price: parseFloat(v)})} />
-                   <div className="sm:col-span-2">
-                      <button onClick={addRoom} className="w-full bg-blue-600 text-white py-3.5 rounded-2xl font-black uppercase text-[10px] shadow-lg hover:bg-black transition-all">Add Unit</button>
+                   <div className="">
+                      <button onClick={addRoom} className="w-full bg-orange-600 text-white py-3.5 rounded-2xl font-black text-[10px] uppercase shadow-lg hover:bg-black transition-all">Add Unit</button>
                    </div>
                 </div>
              </section>
 
              <div className="bg-white rounded-3xl border shadow-sm overflow-hidden overflow-x-auto">
                 <table className="w-full text-left text-[11px]">
-                   <thead className="bg-blue-900 text-white uppercase font-black">
+                   <thead className="bg-slate-900 text-white uppercase font-black">
                       <tr>
                         <th className="p-4">No</th>
+                        <th className="p-4">Bed Type</th>
                         <th className="p-4">Block</th>
                         <th className="p-4">Floor</th>
                         <th className="p-4">Type</th>
@@ -232,9 +302,10 @@ const Settings: React.FC<SettingsProps> = ({
                       {rooms.map(r => (
                         <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                            <td className="p-4 text-base font-black">{r.number}</td>
+                           <td className="p-4 text-slate-500 font-black">{r.bedType || 'Single'}</td>
                            <td className="p-4"><span className="text-emerald-600 font-black">{r.block || 'Main'}</span></td>
                            <td className="p-4 text-slate-400">Level {r.floor}</td>
-                           <td className="p-4"><span className="bg-blue-50 text-blue-900 px-3 py-1 rounded-xl border">{r.type}</span></td>
+                           <td className="p-4"><span className="bg-orange-50 text-orange-900 px-3 py-1 rounded-xl border">{r.type}</span></td>
                            <td className="p-4 text-right font-black">₹{r.price}</td>
                            <td className="p-4 text-center"><button onClick={() => setRooms(rooms.filter(x => x.id !== r.id))} className="text-red-500 font-black hover:underline">Delete</button></td>
                         </tr>
@@ -249,21 +320,21 @@ const Settings: React.FC<SettingsProps> = ({
           <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
              <div className="flex justify-between items-center bg-white p-8 rounded-[2.5rem] border shadow-sm">
                 <div>
-                  <h3 className="font-black uppercase text-xl text-blue-900 tracking-tighter">Team Roster</h3>
+                  <h3 className="font-black uppercase text-xl text-orange-900 tracking-tighter">Team Roster</h3>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Manage Personnel Access & Roles</p>
                 </div>
-                <button onClick={() => setShowAddStaff(true)} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-black transition-all">+ Add Team Member</button>
+                <button onClick={() => setShowAddStaff(true)} className="bg-orange-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-black transition-all">+ Add Team Member</button>
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {supervisors.map(staff => (
-                  <div key={staff.id} className="bg-white border-2 rounded-[2.5rem] p-8 shadow-sm hover:border-blue-500 transition-all group">
+                  <div key={staff.id} className="bg-white border-2 rounded-[2.5rem] p-8 shadow-sm hover:border-orange-500 transition-all group">
                      <div className="flex justify-between items-start mb-6">
-                        <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-900 text-xl font-black">{staff.name.charAt(0)}</div>
+                        <div className="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-900 text-xl font-black">{staff.name.charAt(0)}</div>
                         <span className={`px-4 py-1 rounded-full text-[8px] font-black uppercase ${staff.status === 'ACTIVE' ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600'}`}>{staff.status}</span>
                      </div>
                      <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">{staff.name}</h4>
-                     <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mt-1">{staff.role}</p>
+                     <p className="text-[9px] font-black text-orange-600 uppercase tracking-widest mt-1">{staff.role}</p>
                      <div className="mt-8 pt-6 border-t flex justify-between items-center">
                         <p className="text-[10px] font-bold text-slate-400 uppercase">ID: {staff.loginId}</p>
                         <button onClick={() => removeStaff(staff.id)} className="text-red-300 hover:text-red-500 font-black uppercase text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">Remove</button>
@@ -275,7 +346,7 @@ const Settings: React.FC<SettingsProps> = ({
              {showAddStaff && (
                <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
                   <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                    <div className="bg-blue-900 p-8 text-white flex justify-between items-center">
+                    <div className="bg-orange-600 p-8 text-white flex justify-between items-center">
                        <h3 className="text-xl font-black uppercase tracking-tighter">Add Team Member</h3>
                        <button onClick={() => setShowAddStaff(false)} className="text-[10px] font-black opacity-60 uppercase">Cancel</button>
                     </div>
@@ -297,7 +368,7 @@ const Settings: React.FC<SettingsProps> = ({
                              <option value="STOREKEEPER">STOREKEEPER</option>
                           </select>
                        </div>
-                       <button onClick={handleSaveStaff} className="w-full bg-blue-900 text-white py-6 rounded-[2rem] font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all">Authorize Personnel</button>
+                       <button onClick={handleSaveStaff} className="w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all">Authorize Personnel</button>
                     </div>
                   </div>
                </div>
@@ -309,7 +380,7 @@ const Settings: React.FC<SettingsProps> = ({
           <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
              <section className="bg-white p-8 md:p-12 rounded-[3.5rem] border shadow-sm space-y-10">
                 <div className="border-b pb-6">
-                   <h3 className="text-3xl font-black text-blue-900 uppercase tracking-tighter">Taxation Protocol</h3>
+                   <h3 className="text-3xl font-black text-orange-900 uppercase tracking-tighter">Taxation Protocol</h3>
                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configuring GST & SAC Compliance</p>
                 </div>
                 
@@ -325,9 +396,9 @@ const Settings: React.FC<SettingsProps> = ({
                    <Input label="IGST %" type="number" value={tempSettings.igstRate?.toString() || '0'} onChange={v => handleUpdate('igstRate', parseFloat(v) || 0)} />
                 </div>
                 
-                <div className="p-6 bg-blue-50 border border-blue-100 rounded-3xl flex gap-6 items-start">
+                <div className="p-6 bg-orange-50 border border-orange-100 rounded-3xl flex gap-6 items-start">
                    <div className="text-2xl mt-1">💡</div>
-                   <p className="text-[11px] font-bold text-blue-900 leading-relaxed uppercase">
+                   <p className="text-[11px] font-bold text-orange-900 leading-relaxed uppercase">
                       Changes here will reflect on all new invoices and duplicate re-prints. Ensure rates are as per the latest government regulations for hospitality.
                    </p>
                 </div>
@@ -339,12 +410,12 @@ const Settings: React.FC<SettingsProps> = ({
           <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <section className="bg-white p-12 rounded-[3.5rem] border shadow-sm space-y-8 text-center">
-                   <div className="w-20 h-20 bg-blue-50 text-blue-900 rounded-[2rem] flex items-center justify-center text-4xl mx-auto shadow-inner">📤</div>
+                   <div className="w-20 h-20 bg-orange-50 text-orange-900 rounded-[2rem] flex items-center justify-center text-4xl mx-auto shadow-inner">📤</div>
                    <div>
                       <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Export Archive</h3>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Download full local database as JSON</p>
                    </div>
-                   <button onClick={exportDatabase} className="w-full bg-blue-900 text-white py-6 rounded-[2rem] font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all">Download Now</button>
+                   <button onClick={exportDatabase} className="w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all">Download Now</button>
                 </section>
 
                 <section className="bg-white p-12 rounded-[3.5rem] border shadow-sm space-y-8 text-center">
@@ -359,11 +430,6 @@ const Settings: React.FC<SettingsProps> = ({
                    </div>
                 </section>
              </div>
-             
-             <div className="bg-orange-50 border-2 border-dashed border-orange-200 p-10 rounded-[3rem] text-center">
-                <p className="text-[12px] font-black text-orange-900 uppercase tracking-tight">Warning: Restore will overwrite all existing local records.</p>
-                <p className="text-[10px] font-bold text-orange-600 uppercase mt-2 opacity-70">Always export a fresh backup before attempting a restore.</p>
-             </div>
           </div>
         )}
 
@@ -371,7 +437,7 @@ const Settings: React.FC<SettingsProps> = ({
            <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
               <section className="bg-white p-12 rounded-[3.5rem] border shadow-sm space-y-10">
                  <div className="border-b pb-6">
-                    <h3 className="text-3xl font-black text-blue-900 uppercase tracking-tighter">Guest Portal Config</h3>
+                    <h3 className="text-3xl font-black text-orange-900 uppercase tracking-tighter">Guest Portal Config</h3>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Smart Interaction & Self-Service Nodes</p>
                  </div>
                  
@@ -383,11 +449,11 @@ const Settings: React.FC<SettingsProps> = ({
                  <Input label="Standalone Restaurant Menu Link" value={tempSettings.restaurantMenuLink || ''} onChange={v => handleUpdate('restaurantMenuLink', v)} placeholder="https://..." />
                  
                  <div className="flex flex-col items-center gap-6 pt-10 border-t">
-                    <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border-4 border-blue-900">
+                    <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border-4 border-orange-600">
                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin + '?portal=guest')}`} alt="Guest Portal QR" />
                     </div>
                     <div className="text-center">
-                       <p className="text-[11px] font-black uppercase text-blue-900">QR CODE FOR GUEST SELF-CHECKIN</p>
+                       <p className="text-[11px] font-black uppercase text-orange-900">QR CODE FOR GUEST SELF-CHECKIN</p>
                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest leading-relaxed">Guests can scan this at reception for <br/> express check-in and room service</p>
                     </div>
                  </div>
@@ -400,7 +466,7 @@ const Settings: React.FC<SettingsProps> = ({
 };
 
 const SubTab: React.FC<{ active: boolean, label: string, onClick: () => void }> = ({ active, label, onClick }) => (
-  <button onClick={onClick} className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 ${active ? 'bg-blue-900 text-white shadow-lg' : 'bg-transparent text-slate-400 hover:text-slate-900'}`}>{label}</button>
+  <button onClick={onClick} className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 ${active ? 'bg-orange-600 text-white shadow-lg' : 'bg-transparent text-slate-400 hover:text-slate-900'}`}>{label}</button>
 );
 
 const Input: React.FC<{ label: string, value: any, onChange?: (v: string) => void, type?: string, readOnly?: boolean, placeholder?: string }> = ({ label, value, onChange, type = "text", readOnly = false, placeholder = "" }) => (
@@ -410,7 +476,7 @@ const Input: React.FC<{ label: string, value: any, onChange?: (v: string) => voi
       type={type} 
       readOnly={readOnly}
       placeholder={placeholder}
-      className={`w-full border-2 p-3.5 rounded-2xl font-black text-[11px] ${readOnly ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 focus:bg-white'} transition-all shadow-inner text-black outline-none focus:border-blue-500`} 
+      className={`w-full border-2 p-3.5 rounded-2xl font-black text-[11px] ${readOnly ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 focus:bg-white'} transition-all shadow-inner text-black outline-none focus:border-orange-500`} 
       value={value || ''} 
       onChange={e => onChange && onChange(e.target.value)} 
     />
