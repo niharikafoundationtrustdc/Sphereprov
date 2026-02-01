@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Room, RoomStatus, Guest, Booking, HostelSettings, Transaction, GroupProfile, UserRole, Supervisor, Quotation } from './types.ts';
 import { INITIAL_ROOMS } from './constants.tsx';
 import { db, exportDatabase } from './services/db.ts';
-import { pullFromCloud, subscribeToTable } from './services/supabase.ts';
+import { pullFromCloud, subscribeToTable, IS_CLOUD_ENABLED } from './services/supabase.ts';
 import GuestCheckin from './components/GuestCheckin.tsx';
 import StayManagement from './components/StayManagement.tsx';
 import Reports from './components/Reports.tsx';
@@ -94,22 +94,27 @@ const App: React.FC = () => {
     const init = async () => {
       try {
         const tables = ['rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'settings'];
-        for (const table of tables) {
-          const cloudData = await pullFromCloud(table);
-          if (cloudData.length > 0) { await (db as any)[table].bulkPut(cloudData); }
+        if (IS_CLOUD_ENABLED) {
+          for (const table of tables) {
+            const cloudData = await pullFromCloud(table);
+            if (cloudData.length > 0) { await (db as any)[table].bulkPut(cloudData); }
+          }
         }
-        const r = await db.rooms.toArray();
-        if (r.length === 0) { await db.rooms.bulkPut(INITIAL_ROOMS); }
+        
+        // Removed auto-seeding logic to respect "Delete all rooms I will add my self"
         await refreshLocalState();
-        tables.forEach(tableName => {
-          subscribeToTable(tableName, async (payload) => {
-            const table = (db as any)[tableName];
-            if (!table) return;
-            if (payload.eventType === 'DELETE') { await table.delete(payload.old.id); } 
-            else { await table.put(payload.new); }
-            refreshLocalState();
+        
+        if (IS_CLOUD_ENABLED) {
+          tables.forEach(tableName => {
+            subscribeToTable(tableName, async (payload) => {
+              const table = (db as any)[tableName];
+              if (!table) return;
+              if (payload.eventType === 'DELETE') { await table.delete(payload.old.id); } 
+              else { await table.put(payload.new); }
+              refreshLocalState();
+            });
           });
-        });
+        }
       } catch (e) { console.error("Initialization error:", e); }
       setIsLoading(false);
     };
@@ -342,14 +347,21 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-y-auto custom-scrollbar no-print">{renderContent()}</main>
 
       <footer className="bg-white border-t border-slate-200 px-4 md:px-10 py-5 flex flex-col md:flex-row justify-between items-center z-40 no-print gap-6 shadow-[0_-10px_30px_rgba(0,0,0,0.03)]">
-        <div className="flex gap-8 items-center overflow-x-auto scrollbar-hide">
-          <Stat label="TOTAL UNITS" count={rooms.length} color="text-blue-900" onClick={() => setStatusFilter('ALL')} active={statusFilter === 'ALL'} />
+        <div className="flex gap-4 md:gap-8 items-center overflow-x-auto scrollbar-hide">
+          <Stat label="TOTAL" count={rooms.length} color="text-blue-900" onClick={() => setStatusFilter('ALL')} active={statusFilter === 'ALL'} />
           <Stat label="VACANT" count={rooms.filter(r=>r.status===RoomStatus.VACANT).length} color="text-emerald-600" onClick={() => setStatusFilter(RoomStatus.VACANT)} active={statusFilter === RoomStatus.VACANT} />
           <Stat label="OCCUPIED" count={rooms.filter(r=>r.status===RoomStatus.OCCUPIED).length} color="text-orange-600" onClick={() => setStatusFilter(RoomStatus.OCCUPIED)} active={statusFilter === RoomStatus.OCCUPIED} />
           <Stat label="DIRTY" count={rooms.filter(r=>r.status===RoomStatus.DIRTY).length} color="text-rose-600" onClick={() => setStatusFilter(RoomStatus.DIRTY)} active={statusFilter === RoomStatus.DIRTY} />
           <Stat label="REPAIR" count={rooms.filter(r=>r.status===RoomStatus.REPAIR).length} color="text-slate-500" onClick={() => setStatusFilter(RoomStatus.REPAIR)} active={statusFilter === RoomStatus.REPAIR} />
         </div>
-        <div className="flex items-center gap-4">
+        
+        {/* Connection Status Badge */}
+        <div className={`px-4 py-2 rounded-xl flex items-center gap-3 border-2 shrink-0 ${IS_CLOUD_ENABLED ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-rose-50 border-rose-500 text-rose-700'}`}>
+           <div className={`w-2 h-2 rounded-full ${IS_CLOUD_ENABLED ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
+           <span className="text-[10px] font-black uppercase tracking-widest">{IS_CLOUD_ENABLED ? 'Cloud Connected' : 'Offline Mode (Local)'}</span>
+        </div>
+
+        <div className="flex items-center gap-4 shrink-0">
            <FooterBtn label="ARCHIVE" onClick={() => setShowGlobalArchive(true)} icon="📄" />
            <FooterBtn label="BACKUP" onClick={exportDatabase} icon="☁️" />
         </div>
@@ -383,14 +395,14 @@ const NavBtn: React.FC<{ label: string, active: boolean, onClick: () => void }> 
 );
 
 const Stat: React.FC<{ label: string, count: number, color: string, onClick: () => void, active: boolean }> = ({ label, count, color, onClick, active }) => (
-  <button onClick={onClick} className={`flex items-center gap-5 shrink-0 p-3 px-6 rounded-2xl transition-all ${active ? 'bg-blue-50 ring-2 ring-blue-900/10' : 'hover:bg-slate-50'}`}>
+  <button onClick={onClick} className={`flex items-center gap-4 md:gap-5 shrink-0 p-3 px-4 md:px-6 rounded-2xl transition-all ${active ? 'bg-blue-50 ring-2 ring-blue-900/10' : 'hover:bg-slate-50'}`}>
     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{label}</span>
-    <span className={`text-3xl font-black ${color} tracking-tighter`}>{count}</span>
+    <span className={`text-2xl md:text-3xl font-black ${color} tracking-tighter`}>{count}</span>
   </button>
 );
 
 const FooterBtn = ({ label, onClick, icon }: any) => (
-  <button onClick={onClick} className="flex items-center gap-3 px-8 py-3.5 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all bg-white text-blue-900 border-2 border-blue-900/10 hover:border-orange-500 shadow-sm">
+  <button onClick={onClick} className="flex items-center gap-3 px-6 md:px-8 py-3.5 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all bg-white text-blue-900 border-2 border-blue-900/10 hover:border-orange-500 shadow-sm whitespace-nowrap">
     <span>{icon}</span>{label}
   </button>
 );

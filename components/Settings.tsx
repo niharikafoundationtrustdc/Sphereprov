@@ -121,37 +121,39 @@ const Settings: React.FC<SettingsProps> = ({
     const room = rooms.find(r => r.id === id);
     if (!room) return;
     
-    if (room.status === RoomStatus.OCCUPIED) {
-      return alert("Action Blocked: This unit is occupied. Check-out the guest first.");
-    }
-    
-    if (!window.confirm(`Are you sure you want to delete Room ${room.number}?`)) return;
+    // Direct forced delete to ensure reliability
+    if (!window.confirm(`PERMANENTLY REMOVE ROOM ${room.number}?\n\nIf this unit is currently occupied, you should perform checkout first to avoid data corruption.`)) return;
     
     try {
+      // 1. Remove from local DB
       await db.rooms.delete(id);
+      // 2. Update local state
       setRooms(rooms.filter(r => r.id !== id));
+      
       if (editingRoomId === id) {
         setEditingRoomId(null);
         setNewRoom({ number: '', block: '', floor: '', type: '', price: 0, bedType: 'Double Bed' });
       }
+      console.log(`Room ${id} deleted successfully.`);
     } catch (e) {
-      alert("Database error. Please refresh.");
+      console.error("Deletion Failed:", e);
+      alert("System failed to execute delete command. Please refresh the page.");
     }
   };
 
   const handleWipeAllRooms = async () => {
     if (rooms.length === 0) return alert("Inventory is already empty.");
     
-    const confirmation = window.prompt("Type 'DELETE ALL' to confirm wiping your entire room inventory. This cannot be undone.");
+    const confirmation = window.prompt("⚠️ WARNING: Type 'DELETE ALL' to confirm wiping your entire room inventory. This action is PERMANENT and will sync across devices if cloud is active.");
     if (confirmation !== 'DELETE ALL') return;
 
     try {
       const ids = rooms.map(r => r.id);
       await db.rooms.bulkDelete(ids);
       setRooms([]);
-      alert("Inventory wiped successfully. You can now add your own rooms.");
+      alert("FULL INVENTORY WIPE COMPLETE. You can now rebuild your registry.");
     } catch (e) {
-      alert("Bulk delete failed. Check database connection.");
+      alert("Wipe procedure failed. Error: " + e);
     }
   };
 
@@ -332,7 +334,7 @@ const Settings: React.FC<SettingsProps> = ({
                         </td>
                       </tr>
                     ))}
-                    {rooms.length === 0 && <tr><td colSpan={5} className="p-20 text-center text-slate-300 italic">No units registered. Start by adding one above.</td></tr>}
+                    {rooms.length === 0 && <tr><td colSpan={5} className="p-20 text-center text-slate-300 italic font-black uppercase">No units registered. Add your rooms above.</td></tr>}
                   </tbody>
                 </table>
              </section>

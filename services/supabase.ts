@@ -16,7 +16,12 @@ const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const SUPABASE_ANON_KEY = getEnv('VITE_SUPABASE_ANON_KEY') || FALLBACK_KEY;
 
 // Guard: Check if sync should even be attempted
-const IS_CONFIG_VALID = SUPABASE_ANON_KEY !== FALLBACK_KEY && !SUPABASE_ANON_KEY.includes('placeholder');
+// If this is FALSE, data remains LOCAL to the current browser/device.
+export const IS_CLOUD_ENABLED = SUPABASE_ANON_KEY !== FALLBACK_KEY && !SUPABASE_ANON_KEY.includes('placeholder') && SUPABASE_ANON_KEY.length > 50;
+
+if (!IS_CLOUD_ENABLED) {
+  console.warn("⚠️ DATABASE STATUS: Local-Only Mode. Changes will NOT sync to other devices until VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are provided in environment variables.");
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -32,15 +37,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
  * Helper to sync local table data to Supabase.
  */
 export async function pushToCloud(tableName: string, data: any) {
-  // 1. Check for valid config
-  if (!IS_CONFIG_VALID) {
-    return true; // Silently skip sync if no real key is provided
-  }
-
-  // 2. Check if device is online
-  if (!navigator.onLine) {
-    return true; 
-  }
+  if (!IS_CLOUD_ENABLED || !navigator.onLine) return true;
 
   try {
     if (!data) return true;
@@ -52,23 +49,11 @@ export async function pushToCloud(tableName: string, data: any) {
       .upsert(payload, { onConflict: 'id' });
     
     if (error) {
-      if (error.code === '42P01') {
-        console.error(`[Supabase Error] Table "${tableName}" missing. Run database_setup.sql.`);
-      } else if (error.message?.includes('JWT')) {
-        console.warn(`[Supabase Auth] Invalid API Key detected. Cloud sync disabled.`);
-      } else {
-        console.error(`[Supabase Sync Error] ${tableName}:`, error.message);
-      }
+      console.error(`[Cloud Sync Error] ${tableName}:`, error.message);
       return false;
     }
     return true;
   } catch (err: any) {
-    if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
-      // Avoid spamming logs for network/CORS/Paused project issues
-      console.debug(`[Cloud Sync] Unreachable: Project might be paused or network is blocked.`);
-    } else {
-      console.error(`[Cloud Connection Failed] ${tableName}:`, err);
-    }
     return false;
   }
 }
@@ -77,7 +62,7 @@ export async function pushToCloud(tableName: string, data: any) {
  * Helper to remove record from Supabase.
  */
 export async function removeFromCloud(tableName: string, id: string) {
-  if (!IS_CONFIG_VALID || !navigator.onLine) return true;
+  if (!IS_CLOUD_ENABLED || !navigator.onLine) return true;
 
   try {
     const { error } = await supabase
@@ -87,7 +72,6 @@ export async function removeFromCloud(tableName: string, id: string) {
     if (error) throw error;
     return true;
   } catch (err) {
-    console.debug(`[Cloud Delete Failed] ${tableName}:`, err);
     return false;
   }
 }
@@ -96,14 +80,13 @@ export async function removeFromCloud(tableName: string, id: string) {
  * Fetches all records from a Supabase table.
  */
 export async function pullFromCloud(tableName: string) {
-  if (!IS_CONFIG_VALID || !navigator.onLine) return [];
+  if (!IS_CLOUD_ENABLED || !navigator.onLine) return [];
 
   try {
     const { data, error } = await supabase.from(tableName).select('*');
     if (error) throw error;
     return data || [];
   } catch (err) {
-    console.debug(`[Cloud Pull Failed] ${tableName}:`, err);
     return [];
   }
 }
@@ -112,7 +95,7 @@ export async function pullFromCloud(tableName: string) {
  * Subscribe to real-time changes for a table.
  */
 export function subscribeToTable(tableName: string, onUpdate: (payload: any) => void) {
-  if (!IS_CONFIG_VALID) return { unsubscribe: () => {} };
+  if (!IS_CLOUD_ENABLED) return { unsubscribe: () => {} };
 
   return supabase
     .channel(`${tableName}-changes`)
@@ -123,9 +106,5 @@ export function subscribeToTable(tableName: string, onUpdate: (payload: any) => 
         onUpdate(payload);
       }
     )
-    .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR') {
-        console.warn(`[Realtime] Subscription error for ${tableName}. Ensure Realtime is enabled in Supabase.`);
-      }
-    });
+    .subscribe();
 }
