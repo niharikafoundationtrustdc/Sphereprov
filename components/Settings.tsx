@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HostelSettings, Room, RoomStatus, Supervisor, BlockConfig } from '../types.ts';
+import { HostelSettings, Room, RoomStatus, Supervisor, BlockConfig, UserRole } from '../types.ts';
 import { exportDatabase, db } from '../services/db.ts';
 
 interface SettingsProps {
@@ -111,7 +111,6 @@ const Settings: React.FC<SettingsProps> = ({
     setRooms(rooms.map(r => r.id === roomId ? updated : r));
   };
 
-  // FIXED: Delete button function now correctly awaits database removal
   const handleDeleteRoom = async (id: string) => {
     if (!confirm("Permanently delete this inventory unit? This cannot be undone.")) return;
     try {
@@ -125,12 +124,17 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const handleStaffSave = async () => {
-    if (!editingStaff?.name || !editingStaff?.loginId || !editingStaff?.password) return alert("Fill mandatory fields");
+    if (!editingStaff?.name || !editingStaff?.loginId || !editingStaff?.password) return alert("Fill mandatory fields (Name, Login ID, Password)");
     const staffObj: Supervisor = {
       ...editingStaff as Supervisor,
       id: editingStaff.id || `STF-${Date.now()}`,
       status: editingStaff.status || 'ACTIVE',
+      role: editingStaff.role || 'WAITER',
       assignedRoomIds: editingStaff.assignedRoomIds || [],
+      basicPay: editingStaff.basicPay || 0,
+      hra: editingStaff.hra || 0,
+      vehicleAllowance: editingStaff.vehicleAllowance || 0,
+      otherAllowances: editingStaff.otherAllowances || 0,
     } as Supervisor;
     const nextStaffList = editingStaff.id 
       ? supervisors.map(s => s.id === staffObj.id ? staffObj : s)
@@ -154,6 +158,54 @@ const Settings: React.FC<SettingsProps> = ({
           <SubTab active={activeSubTab === 'DATA'} label="Global Backups" onClick={() => setActiveSubTab('DATA')} />
         </div>
 
+        {activeSubTab === 'STAFF' && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+             <div className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-[3rem] border shadow-sm gap-6">
+                <div>
+                   <h3 className="text-3xl font-black text-[#1a2b4b] uppercase tracking-tighter">EMPLOYEE REGISTER</h3>
+                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Personnel Management & Salary Configuration</p>
+                </div>
+                <button 
+                   onClick={() => { setEditingStaff({ role: 'WAITER', status: 'ACTIVE', assignedRoomIds: [], basicPay: 0, hra: 0, vehicleAllowance: 0, otherAllowances: 0 }); setShowStaffModal(true); }} 
+                   className="bg-[#e65c00] text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase shadow-xl hover:bg-black transition-all transform hover:scale-105 active:scale-95"
+                >
+                   + Enroll New Staff
+                </button>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {supervisors.map(staffMember => (
+                   <div key={staffMember.id} className="bg-white border-2 border-transparent rounded-[3.5rem] p-8 shadow-sm hover:shadow-2xl hover:border-orange-500 transition-all group cursor-pointer flex flex-col justify-between" onClick={() => { setEditingStaff(staffMember); setShowStaffModal(true); }}>
+                      <div>
+                         <div className="flex justify-between items-start mb-6">
+                            <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-2xl font-black text-orange-600 shadow-inner border border-slate-100">
+                               {staffMember.photo ? <img src={staffMember.photo} className="w-full h-full object-cover rounded-3xl" /> : staffMember.name.charAt(0)}
+                            </div>
+                            <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest ${staffMember.status === 'ACTIVE' ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                               {staffMember.status}
+                            </span>
+                         </div>
+                         <h4 className="text-2xl font-black text-[#1a2b4b] uppercase tracking-tighter leading-none">{staffMember.name}</h4>
+                         <div className="flex items-center gap-2 mt-3">
+                            <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-[9px] font-black uppercase border border-blue-100">{staffMember.role}</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">ID: {staffMember.loginId}</span>
+                         </div>
+                      </div>
+                      
+                      <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between items-center text-[10px] font-bold uppercase text-slate-400">
+                         <span>Salary: ₹{staffMember.basicPay || 0}</span>
+                         <span className="text-blue-500 font-black">View Profile →</span>
+                      </div>
+                   </div>
+                ))}
+                {supervisors.length === 0 && (
+                   <div className="col-span-full py-32 text-center text-slate-300 font-black uppercase tracking-[0.2em] border-4 border-dashed rounded-[4rem]">No staff members enrolled</div>
+                )}
+             </div>
+          </div>
+        )}
+
+        {/* ... (Other SubTabs logic - GENERAL, MASTERS, ROOMS, TAX, DATA - Remain same) ... */}
         {activeSubTab === 'MASTERS' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in duration-500">
             <MasterBox title="Block Master (e.g. Ayodhya, Mithila)">
@@ -271,7 +323,6 @@ const Settings: React.FC<SettingsProps> = ({
                          <div>
                             <div className="flex justify-between items-start mb-4">
                                <span className="bg-white px-3 py-1 rounded-full text-[9px] font-black uppercase text-slate-400 border">{r.block} | {r.floor}</span>
-                               {/* FIXED: Delete button now calls handleDeleteRoom which awaits database action */}
                                <button onClick={() => handleDeleteRoom(r.id)} className="text-red-500 font-black text-lg p-1 hover:scale-125 transition-transform">×</button>
                             </div>
                             <h4 className="text-2xl font-black text-blue-900 tracking-tighter leading-none">{r.number}</h4>
@@ -298,40 +349,33 @@ const Settings: React.FC<SettingsProps> = ({
                          </div>
                       </div>
                    ))}
-                   {rooms.length === 0 && (
-                      <div className="col-span-full py-20 text-center opacity-20 italic">No inventory units currently registered.</div>
-                   )}
                 </div>
              </section>
           </div>
         )}
 
-        {activeSubTab === 'STAFF' && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-             <div className="flex justify-between items-end">
-                <div>
-                   <h3 className="text-3xl font-black text-[#1a2b4b] uppercase tracking-tighter">EMPLOYEE REGISTER</h3>
-                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Personnel Management & Salary Configuration</p>
-                </div>
-                <button onClick={() => { setEditingStaff({ role: 'WAITER', status: 'ACTIVE', assignedRoomIds: [] }); setShowStaffModal(true); }} className="bg-[#e65c00] text-white px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-black transition-all">+ ADD NEW STAFF</button>
-             </div>
+        {activeSubTab === 'TAX' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-500">
+            <section className="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
+              <h3 className="font-black text-black uppercase text-xs tracking-widest border-b pb-4">Tax & Compliance Settings</h3>
+              <Input label="GST Number" value={tempSettings.gstNumber || ''} onChange={v => handleUpdate('gstNumber', v)} />
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Default GST Rate (%)" type="number" value={tempSettings.taxRate?.toString() || '12'} onChange={v => handleUpdate('taxRate', parseFloat(v))} />
+                <Input label="Default HSN Code" value={tempSettings.hsnCode || '9963'} onChange={v => handleUpdate('hsnCode', v)} />
+              </div>
+            </section>
+          </div>
+        )}
 
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {supervisors.map(staffMember => (
-                   <div key={staffMember.id} className="bg-white border rounded-[3rem] p-8 shadow-sm hover:shadow-2xl transition-all group cursor-pointer" onClick={() => { setEditingStaff(staffMember); setShowStaffModal(true); }}>
-                      <div className="flex justify-between items-start mb-6">
-                         <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-xl font-black text-slate-300">
-                            {staffMember.photo ? <img src={staffMember.photo} className="w-full h-full object-cover rounded-2xl" /> : staffMember.name.charAt(0)}
-                         </div>
-                         <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${staffMember.status === 'ACTIVE' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                            {staffMember.status}
-                         </span>
-                      </div>
-                      <h4 className="text-xl font-black text-[#1a2b4b] uppercase leading-tight">{staffMember.name}</h4>
-                      <p className="text-[10px] font-bold text-[#e65c00] uppercase tracking-widest mt-1">{staffMember.role}</p>
-                   </div>
-                ))}
+        {activeSubTab === 'DATA' && (
+          <div className="bg-white p-12 rounded-[3rem] border shadow-sm space-y-8 animate-in fade-in duration-500">
+             <div className="flex items-center gap-6 border-b pb-8">
+               <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-4xl">💾</div>
+               <div>
+                 <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Database Management</h2>
+               </div>
              </div>
+             <button onClick={exportDatabase} className="w-full bg-blue-900 text-white py-4 rounded-2xl font-black text-xs uppercase shadow-lg">Download Global JSON</button>
           </div>
         )}
 
@@ -378,39 +422,120 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
           </div>
         )}
-
-        {activeSubTab === 'DATA' && (
-          <div className="bg-white/90 p-12 rounded-[3.5rem] border shadow-sm space-y-8 animate-in fade-in duration-500 backdrop-blur-md">
-             <div className="flex items-center gap-6 border-b pb-8">
-               <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-4xl">💾</div>
-               <div>
-                 <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Database Ops</h2>
-               </div>
-             </div>
-             <button onClick={exportDatabase} className="w-full bg-blue-900 text-white py-4 rounded-2xl font-black text-xs uppercase shadow-lg">Download Backup JSON</button>
-          </div>
-        )}
       </div>
 
+      {/* STAFF MANAGEMENT MODAL (UX IMPROVED) */}
       {showStaffModal && editingStaff && (
-         <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-4xl h-[80vh] rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col border-[12px] border-white">
+         <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-xl flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-6xl h-[90vh] rounded-[4rem] shadow-2xl overflow-hidden animate-in zoom-in duration-500 flex flex-col border-[12px] border-white">
+               
+               {/* Modal Header */}
                <div className="bg-[#1a2b4b] p-10 text-white flex justify-between items-center shrink-0">
-                  <h3 className="text-3xl font-black uppercase tracking-tighter">Staff Registry</h3>
+                  <div className="flex items-center gap-6">
+                     <div className="w-16 h-16 bg-white/10 rounded-[1.5rem] flex items-center justify-center text-4xl shadow-inner border border-white/5">👤</div>
+                     <div>
+                        <h3 className="text-3xl md:text-4xl font-black uppercase tracking-tighter leading-none">{editingStaff.id ? 'Employee Profile' : 'New Enrollment'}</h3>
+                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-300 mt-2">Personnel Master Registry Node</p>
+                     </div>
+                  </div>
                   <div className="flex gap-4">
-                     <button onClick={() => setShowStaffModal(false)} className="bg-white/10 hover:bg-white/20 px-8 py-3 rounded-2xl font-black text-xs uppercase">Discard</button>
-                     <button onClick={handleStaffSave} className="bg-[#e65c00] hover:bg-[#ff6a00] px-10 py-3 rounded-2xl font-black text-xs uppercase shadow-2xl">Save Member</button>
+                     <button onClick={() => setShowStaffModal(false)} className="bg-white/10 hover:bg-white/20 px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">Discard</button>
+                     <button onClick={handleStaffSave} className="bg-[#e65c00] hover:bg-orange-500 px-10 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl transition-all transform active:scale-95">Authorize Record</button>
                   </div>
                </div>
-               <div className="flex-1 overflow-y-auto p-10 bg-slate-50 space-y-8">
-                  <section className="bg-white p-8 rounded-[3rem] shadow-sm space-y-6">
-                     <Inp label="Employee Full Name *" value={editingStaff.name} onChange={(v: string) => setEditingStaff({...editingStaff, name: v})} />
-                     <div className="grid grid-cols-2 gap-4">
-                        <Inp label="Login Identity *" value={editingStaff.loginId} onChange={(v: string) => setEditingStaff({...editingStaff, loginId: v})} />
-                        <Inp label="Secret Key (Pass) *" type="password" value={editingStaff.password} onChange={(v: string) => setEditingStaff({...editingStaff, password: v})} />
+
+               {/* Modal Body */}
+               <div className="flex-1 overflow-y-auto p-10 md:p-14 bg-slate-50 custom-scrollbar">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-14">
+                     
+                     {/* Left Side: Identity & Credentials */}
+                     <div className="lg:col-span-7 space-y-12">
+                        
+                        <section className="bg-white p-10 rounded-[3.5rem] shadow-sm space-y-8 border-2 border-slate-50">
+                           <div className="flex items-center gap-4 border-b pb-4">
+                              <span className="w-8 h-8 bg-blue-900 rounded-xl flex items-center justify-center text-white text-[10px] font-black">01</span>
+                              <h4 className="text-lg font-black text-blue-900 uppercase tracking-tighter">Primary Identity</h4>
+                           </div>
+                           <Inp label="Employee Full Legal Name *" value={editingStaff.name} onChange={(v: string) => setEditingStaff({...editingStaff, name: v})} placeholder="As per Govt ID" />
+                           <div className="grid grid-cols-2 gap-6">
+                              <div className="space-y-1.5">
+                                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Module Access (Role)</label>
+                                 <select className="w-full border-2 p-4 rounded-2xl font-black text-xs bg-slate-50 outline-none focus:bg-white focus:border-blue-600 transition-all text-slate-900" value={editingStaff.role} onChange={e => setEditingStaff({...editingStaff, role: e.target.value as any})}>
+                                    <option value="RECEPTIONIST">Front Desk Receptionist</option>
+                                    <option value="MANAGER">Property General Manager</option>
+                                    <option value="WAITER">F&B Service Staff / Waiter</option>
+                                    <option value="CHEF">Kitchen Staff / Chef</option>
+                                    <option value="SUPERVISOR">Housekeeping Supervisor</option>
+                                    <option value="ACCOUNTANT">Financial Accountant</option>
+                                    <option value="STOREKEEPER">Inventory Store Keeper</option>
+                                 </select>
+                              </div>
+                              <div className="space-y-1.5">
+                                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Account Status</label>
+                                 <select className="w-full border-2 p-4 rounded-2xl font-black text-xs bg-slate-50 outline-none focus:bg-white focus:border-blue-600 transition-all text-slate-900" value={editingStaff.status} onChange={e => setEditingStaff({...editingStaff, status: e.target.value as any})}>
+                                    <option value="ACTIVE">ACTIVE (Authorized)</option>
+                                    <option value="INACTIVE">DEACTIVATED (Locked)</option>
+                                 </select>
+                              </div>
+                           </div>
+                           <Inp label="Contact Phone Number" value={editingStaff.phone} onChange={(v: string) => setEditingStaff({...editingStaff, phone: v})} placeholder="99XXXXXXXX" />
+                        </section>
+
+                        <section className="bg-white p-10 rounded-[3.5rem] shadow-sm space-y-8 border-2 border-orange-500/20">
+                           <div className="flex items-center gap-4 border-b pb-4">
+                              <span className="w-8 h-8 bg-orange-600 rounded-xl flex items-center justify-center text-white text-[10px] font-black">02</span>
+                              <h4 className="text-lg font-black text-orange-600 uppercase tracking-tighter">Security Credentials</h4>
+                           </div>
+                           <div className="grid grid-cols-2 gap-6">
+                              <Inp label="System Login Identity *" value={editingStaff.loginId} onChange={(v: string) => setEditingStaff({...editingStaff, loginId: v})} placeholder="username" />
+                              <Inp label="Secret Access Key (Pass) *" type="password" value={editingStaff.password} onChange={(v: string) => setEditingStaff({...editingStaff, password: v})} placeholder="••••••••" />
+                           </div>
+                           <p className="text-[9px] font-bold text-slate-400 uppercase text-center bg-slate-50 py-3 rounded-xl border border-dashed">Sensitive account keys are encrypted during transit</p>
+                        </section>
+
                      </div>
-                  </section>
+
+                     {/* Right Side: Compensation & HR */}
+                     <div className="lg:col-span-5 space-y-12">
+                        
+                        <section className="bg-white p-10 rounded-[3.5rem] shadow-sm space-y-8 border-2 border-slate-50">
+                           <div className="flex items-center gap-4 border-b pb-4">
+                              <span className="w-8 h-8 bg-emerald-600 rounded-xl flex items-center justify-center text-white text-[10px] font-black">03</span>
+                              <h4 className="text-lg font-black text-emerald-600 uppercase tracking-tighter">Compensation Model</h4>
+                           </div>
+                           <div className="grid grid-cols-2 gap-6">
+                              <Inp label="Monthly Basic Salary (₹)" type="number" value={editingStaff.basicPay?.toString()} onChange={(v: string) => setEditingStaff({...editingStaff, basicPay: parseFloat(v) || 0})} />
+                              <Inp label="HRA Allowance (₹)" type="number" value={editingStaff.hra?.toString()} onChange={(v: string) => setEditingStaff({...editingStaff, hra: parseFloat(v) || 0})} />
+                           </div>
+                           <div className="grid grid-cols-2 gap-6">
+                              <Inp label="Vehicle Allowance (₹)" type="number" value={editingStaff.vehicleAllowance?.toString()} onChange={(v: string) => setEditingStaff({...editingStaff, vehicleAllowance: parseFloat(v) || 0})} />
+                              <Inp label="Special/Other Fix (₹)" type="number" value={editingStaff.otherAllowances?.toString()} onChange={(v: string) => setEditingStaff({...editingStaff, otherAllowances: parseFloat(v) || 0})} />
+                           </div>
+                           <div className="bg-slate-900 p-6 rounded-3xl text-white flex justify-between items-center shadow-xl">
+                              <span className="text-[10px] font-black uppercase text-slate-400">Net CTC (Est)</span>
+                              <span className="text-2xl font-black tracking-tighter">₹{((editingStaff.basicPay || 0) + (editingStaff.hra || 0) + (editingStaff.vehicleAllowance || 0) + (editingStaff.otherAllowances || 0)).toFixed(0)}</span>
+                           </div>
+                        </section>
+
+                        <section className="bg-white p-10 rounded-[3.5rem] shadow-sm space-y-6 border-2 border-slate-50">
+                           <div className="flex items-center gap-4 border-b pb-4">
+                              <span className="w-8 h-8 bg-slate-400 rounded-xl flex items-center justify-center text-white text-[10px] font-black">04</span>
+                              <h4 className="text-lg font-black text-slate-400 uppercase tracking-tighter">Banking & Payout</h4>
+                           </div>
+                           <Inp label="Bank Name" value={editingStaff.bankName} onChange={(v: string) => setEditingStaff({...editingStaff, bankName: v})} placeholder="e.g. SBI, HDFC" />
+                           <Inp label="A/C Number" value={editingStaff.accountNumber} onChange={(v: string) => setEditingStaff({...editingStaff, accountNumber: v})} placeholder="Bank account number" />
+                           <Inp label="UAN Number (PF)" value={editingStaff.uanNumber} onChange={(v: string) => setEditingStaff({...editingStaff, uanNumber: v})} placeholder="12 digit UAN" />
+                        </section>
+
+                     </div>
+                  </div>
                </div>
+
+               {/* Modal Footer (Sticky if needed, but here part of flex column) */}
+               <div className="bg-slate-50 border-t p-6 text-center">
+                  <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.5em]">System Node Registry v3.4.0 • Enterprise Resource Access</p>
+               </div>
+
             </div>
          </div>
       )}
@@ -437,9 +562,9 @@ const Input: React.FC<{ label: string, value: any, onChange?: (v: string) => voi
 );
 
 const Inp: React.FC<{ label: string, value: any, onChange: (v: string) => void, type?: string, placeholder?: string }> = ({ label, value, onChange, type = "text", placeholder = "" }) => (
-   <div className="space-y-1 w-full text-left">
+   <div className="space-y-1.5 w-full text-left">
      <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">{label}</label>
-     <input type={type} placeholder={placeholder} className="w-full border-2 p-4 rounded-2xl font-black text-xs bg-slate-50 focus:bg-white outline-none transition-all shadow-inner text-black" value={value || ''} onChange={e => onChange(e.target.value)} />
+     <input type={type} placeholder={placeholder} className="w-full border-2 p-4 rounded-2xl font-black text-xs bg-slate-50 focus:bg-white outline-none transition-all shadow-inner text-black focus:border-blue-600" value={value || ''} onChange={e => onChange(e.target.value)} />
    </div>
 );
 
