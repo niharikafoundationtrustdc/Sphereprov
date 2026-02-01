@@ -14,7 +14,8 @@ interface SettingsProps {
 const Settings: React.FC<SettingsProps> = ({ settings, setSettings, rooms, setRooms }) => {
   const [activeSubTab, setActiveSubTab] = useState<'GENERAL' | 'ROOMS' | 'AGENTS' | 'TAX' | 'CLOUD'>('GENERAL');
   const [tempSettings, setTempSettings] = useState<HostelSettings>(settings);
-  const [newRoom, setNewRoom] = useState<Partial<Room>>({ number: '', floor: 1, type: settings.roomTypes[0] || '', price: 0 });
+  // Fix: Changed floor from number (1) to string ('1') to match Room interface definition in types.ts
+  const [newRoom, setNewRoom] = useState<Partial<Room>>({ number: '', floor: '1', type: settings.roomTypes[0] || '', price: 0 });
   const [newRoomType, setNewRoomType] = useState('');
   const [newAgent, setNewAgent] = useState<AgentConfig>({ name: '', commission: 0 });
 

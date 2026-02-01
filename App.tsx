@@ -55,12 +55,17 @@ const App: React.FC = () => {
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
   
   const [settings, setSettings] = useState<HostelSettings>({
+    id: 'primary',
     name: 'Shubhkamna Hotel And Resort',
     address: 'Ayodhya',
     agents: [{ name: 'Direct', commission: 0 }],
     roomTypes: ['DELUXE ROOM', 'PREMIUM ROOM', 'SUPER PREMIUM ROOM', 'SUITE ROOM'],
     mealPlans: ['EP (Room Only)', 'CP (Breakfast)', 'MAP (Half Board)', 'AP (Full Board)'],
-    floors: [1, 2, 3],
+    floors: ['1st Floor', '2nd Floor', '3rd Floor'],
+    blocks: [
+      { id: 'b1', name: 'Ayodhya', prefix: 'A', color: 'blue' },
+      { id: 'b2', name: 'Mithila', prefix: 'M', color: 'orange' }
+    ],
     taxRate: 12,
     wifiPassword: 'hotelsphere123',
     receptionPhone: '9',
@@ -106,7 +111,7 @@ const App: React.FC = () => {
     const init = async () => {
       try {
         setIsCloudSyncing(true);
-        const tables = ['rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'settings', 'payroll'];
+        const tables = ['rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'settings'];
         for (const table of tables) {
           const cloudData = await pullFromCloud(table);
           if (cloudData.length > 0) {
@@ -207,7 +212,7 @@ const App: React.FC = () => {
         if (r.id === newRoomId) return { ...r, status: RoomStatus.OCCUPIED, currentBookingId: bookingId };
         return r;
       });
-      await db.rooms.bulkPut(updatedRooms.filter(x => x.id));
+      await db.rooms.bulkPut(updatedRooms);
       setRooms(updatedRooms);
       setBookings(bookings.map(b => b.id === bookingId ? updatedBooking : b));
     } catch (err) {
@@ -225,7 +230,7 @@ const App: React.FC = () => {
     };
     await db.bookings.put(updatedBooking);
     const updatedRooms = rooms.map(r => r.id === b.roomId ? { ...r, status: RoomStatus.OCCUPIED, currentBookingId: b.id } : r);
-    await db.rooms.bulkPut(updatedRooms.filter(x => x.id));
+    await db.rooms.bulkPut(updatedRooms);
     setRooms(updatedRooms);
     setBookings(bookings.map(book => book.id === b.id ? updatedBooking : book));
     setShowReservationPipeline(false);
@@ -251,7 +256,7 @@ const App: React.FC = () => {
           setBookings(bookings.map(x => x.id === bu.id ? bu : x)); 
           if (bu.status === 'COMPLETED') {
              const rs = rooms.map(rm => rm.id === bu.roomId ? { ...rm, status: RoomStatus.DIRTY, currentBookingId: undefined } : rm);
-             await db.rooms.bulkPut(rs.filter(x => x.id));
+             await db.rooms.bulkPut(rs);
              setRooms(rs);
           }
         }} 
@@ -285,12 +290,12 @@ const App: React.FC = () => {
           const gId = data.guest.id || `G-${Date.now()}`;
           await db.guests.put({ ...data.guest, id: gId } as Guest);
           const bks = data.bookings.map(b => ({ ...b, id: `B-${Math.random().toString(36).substr(2, 5)}`, guestId: gId }));
-          await db.bookings.bulkPut(bks.filter(x => x.id));
+          await db.bookings.bulkPut(bks);
           const updatedRooms = rooms.map(r => {
             const b = bks.find(bk => bk.roomId === r.id);
             return b ? { ...r, status: RoomStatus.OCCUPIED, currentBookingId: b.id } : r;
           });
-          await db.rooms.bulkPut(updatedRooms.filter(x => x.id));
+          await db.rooms.bulkPut(updatedRooms);
           await refreshLocalState();
           setShowCheckinForm(false);
           setSelectedRoom(null);
@@ -305,12 +310,12 @@ const App: React.FC = () => {
       case 'DINING': return <DiningModule rooms={rooms} bookings={bookings} guests={guests} settings={settings} userRole={currentUserRole} onUpdateBooking={async (bu) => { await db.bookings.put(bu); setBookings(bookings.map(b => b.id === bu.id ? bu : b)); }} />;
       case 'FACILITY': return <FacilityModule guests={guests} bookings={bookings} rooms={rooms} settings={settings} onUpdateBooking={async (bu) => { await db.bookings.put(bu); setBookings(bookings.map(b => b.id === bu.id ? bu : b)); }} />;
       case 'TRAVEL': return <TravelModule guests={guests} bookings={bookings} rooms={rooms} settings={settings} onUpdateBooking={async (bu) => { await db.bookings.put(bu); setBookings(bookings.map(b => b.id === bu.id ? bu : b)); }} />;
-      case 'GROUP': return <GroupModule groups={groups} setGroups={async (gs) => { setGroups(gs); await db.groups.bulkPut(gs.filter(x => x.id)); }} rooms={rooms} bookings={bookings} setBookings={async (bks) => { setBookings(bks); await db.bookings.bulkPut(bks.filter(x => x.id)); }} guests={guests} setGuests={setGuests} setRooms={async (rs) => { setRooms(rs); await db.rooms.bulkPut(rs.filter(x => x.id)); }} onAddTransaction={(tx) => { setTransactions([...transactions, tx]); db.transactions.put(tx); }} onGroupPayment={() => {}} settings={settings} />;
+      case 'GROUP': return <GroupModule groups={groups} setGroups={async (gs) => { setGroups(gs); await db.groups.bulkPut(gs); }} rooms={rooms} bookings={bookings} setBookings={async (bks) => { setBookings(bks); await db.bookings.bulkPut(bks); }} guests={guests} setGuests={setGuests} setRooms={async (rs) => { setRooms(rs); await db.rooms.bulkPut(rs); }} onAddTransaction={(tx) => { setTransactions([...transactions, tx]); db.transactions.put(tx); }} onGroupPayment={() => {}} settings={settings} />;
       case 'INVENTORY': return <InventoryModule settings={settings} />;
-      case 'ACCOUNTING': return <Accounting transactions={transactions} setTransactions={async (txs) => { setTransactions(txs); await db.transactions.bulkPut(txs.filter(x => x.id)); }} guests={guests} bookings={bookings} quotations={quotations} setQuotations={async (qs) => { setQuotations(qs); await db.quotations.bulkPut(qs.filter(x => x.id)); }} settings={settings} rooms={rooms} />;
+      case 'ACCOUNTING': return <Accounting transactions={transactions} setTransactions={async (txs) => { setTransactions(txs); await db.transactions.bulkPut(txs); }} guests={guests} bookings={bookings} settings={settings} rooms={rooms} quotations={quotations} setQuotations={async (qs) => { setQuotations(qs); await db.quotations.bulkPut(qs); }} />;
       case 'PAYROLL': return <PayrollModule staff={supervisors} settings={settings} onUpdateTransactions={(tx) => { setTransactions([...transactions, tx]); db.transactions.put(tx); }} />;
       case 'REPORTS': return <Reports bookings={bookings} guests={guests} rooms={rooms} settings={settings} transactions={transactions} shiftLogs={[]} cleaningLogs={[]} quotations={quotations} />;
-      case 'SETTINGS': return <Settings settings={settings} setSettings={async (s)=>{await db.settings.put({...s, id:'primary'}); setSettings(s);}} rooms={rooms} setRooms={async (rs)=>{setRooms(rs); await db.rooms.bulkPut(rs.filter(x => x.id));}} supervisors={supervisors} setSupervisors={async (sups) => { setSupervisors(sups); await db.supervisors.bulkPut(sups.filter(x => x.id)); }} />;
+      case 'SETTINGS': return <Settings settings={settings} setSettings={async (s)=>{await db.settings.put(s); setSettings(s);}} rooms={rooms} setRooms={async (rs)=>{setRooms(rs); await db.rooms.bulkPut(rs);}} supervisors={supervisors} setSupervisors={async (sups) => { setSupervisors(sups); await db.supervisors.bulkPut(sups); }} />;
       default:
         return (
           <div className="p-4 md:p-8 lg:p-10 pb-40 relative animate-in fade-in duration-700">
@@ -321,7 +326,7 @@ const App: React.FC = () => {
                </div>
                <div className="flex flex-col items-center md:items-end gap-4 w-full md:w-auto">
                   <button onClick={toggleFullscreen} className="hidden md:flex bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-bold text-[10px] uppercase shadow-xl hover:bg-orange-600 transition-all items-center gap-3 border border-white/10 group">
-                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l-5 5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
                     FULLSCREEN
                   </button>
                   <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
@@ -336,16 +341,21 @@ const App: React.FC = () => {
             </div>
 
             {Object.entries(roomsByBlock).sort().map(([block, blockRooms]) => {
+              const blockConfig = settings.blocks?.find(b => b.name === block);
               const isAyodhya = block === 'Ayodhya';
-              const blockTheme = isAyodhya 
-                ? 'border-blue-600 shadow-blue-100 ring-blue-50 text-blue-900 bg-blue-50' 
-                : 'border-orange-600 shadow-orange-100 ring-orange-50 text-orange-900 bg-orange-50';
-              const blockIcon = isAyodhya ? '🔱' : '🚩';
+              const isMithila = block === 'Mithila';
+              
+              let blockTheme = 'border-slate-600 shadow-slate-100 ring-slate-50 text-slate-900 bg-slate-50';
+              if (blockConfig?.color === 'blue' || isAyodhya) blockTheme = 'border-blue-600 shadow-blue-100 ring-blue-50 text-blue-900 bg-blue-50';
+              if (blockConfig?.color === 'orange' || isMithila) blockTheme = 'border-orange-600 shadow-orange-100 ring-orange-50 text-orange-900 bg-orange-50';
+              if (blockConfig?.color === 'emerald') blockTheme = 'border-emerald-600 shadow-emerald-100 ring-emerald-50 text-emerald-900 bg-emerald-50';
+
+              const blockIcon = (blockConfig?.color === 'blue' || isAyodhya) ? '🔱' : (blockConfig?.color === 'orange' || isMithila) ? '🚩' : '🏢';
 
               return (
                 <div key={block} className="mb-14">
-                  <h3 className={`text-[12px] font-black uppercase mb-8 tracking-[0.3em] flex items-center gap-4 ${isAyodhya ? 'text-blue-600' : 'text-orange-600'}`}>
-                    <span className={`w-12 h-1 rounded-full ${isAyodhya ? 'bg-blue-600' : 'bg-orange-600'}`}></span>
+                  <h3 className={`text-[12px] font-black uppercase mb-8 tracking-[0.3em] flex items-center gap-4 ${blockTheme.split(' ')[2]}`}>
+                    <span className={`w-12 h-1 rounded-full ${blockTheme.split(' ')[0].replace('border-', 'bg-')}`}></span>
                     {blockIcon} {block} Block Grid
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 md:gap-6">
@@ -364,18 +374,23 @@ const App: React.FC = () => {
                           onClick={() => {
                             if (isSelectionMode) {
                               if (effectiveStatus === RoomStatus.VACANT || effectiveStatus === RoomStatus.DIRTY) toggleRoomSelection(room.id);
-                              else alert("Only vacant or laundry units can be selected for multi check-in.");
+                              else alert("Only vacant units can be selected.");
                             } else {
                               if (activeB || reservedToday) setActiveBookingId((activeB || reservedToday)!.id);
                               else { setSelectedRoom(room); setShowRoomActions(true); }
                             }
                           }} 
-                          className={`min-h-[150px] md:min-h-[170px] border-2 rounded-[2.5rem] md:rounded-[3rem] p-5 md:p-7 flex flex-col items-center justify-between transition-all shadow-md relative group ${isSelected ? 'ring-[10px] ring-orange-50 scale-105 z-10 ' + blockTheme : theme ? `${theme.bg} ${theme.border} ${theme.text}` : `${blockTheme.replace('bg-opacity-100', '')} ${STATUS_COLORS[effectiveStatus].includes('white') ? blockTheme : STATUS_COLORS[effectiveStatus]}`} hover:shadow-2xl hover:-translate-y-1`}
+                          className={`min-h-[170px] md:min-h-[190px] border-2 rounded-[2.5rem] md:rounded-[3rem] p-5 md:p-7 flex flex-col items-center justify-between transition-all shadow-md relative group ${isSelected ? 'ring-[10px] ring-orange-50 scale-105 z-10 ' + blockTheme : theme ? `${theme.bg} ${theme.border} ${theme.text}` : `${blockTheme.replace('bg-opacity-100', '')} ${STATUS_COLORS[effectiveStatus].includes('white') ? blockTheme : STATUS_COLORS[effectiveStatus]}`} hover:shadow-2xl hover:-translate-y-1`}
                         >
                           {isSelected && <div className="absolute -top-3 -right-3 w-8 h-8 bg-orange-600 text-white rounded-2xl flex items-center justify-center text-xs font-black shadow-xl animate-in zoom-in border-4 border-white">✓</div>}
-                          <span className={`text-3xl md:text-4xl font-extrabold tracking-tighter uppercase leading-none ${isAyodhya ? 'text-blue-900' : 'text-orange-900'}`}>{room.number}</span>
+                          
+                          <div className="flex flex-col items-center gap-1">
+                             <span className={`text-2xl md:text-3xl font-extrabold tracking-tighter uppercase leading-none ${blockTheme.split(' ')[3]}`}>{room.number}</span>
+                             <p className="text-[8px] font-black uppercase opacity-40">{room.bedType}</p>
+                          </div>
+
                           <div className="text-center w-full">
-                             <div className={`text-[8px] md:text-[9px] font-black uppercase mb-1.5 opacity-60 truncate ${theme ? theme.status.split(' ')[0] : (isAyodhya ? 'text-blue-800' : 'text-orange-800')}`}>
+                             <div className={`text-[8px] md:text-[9px] font-black uppercase mb-1.5 opacity-60 truncate ${theme ? theme.status.split(' ')[0] : blockTheme.split(' ')[3]}`}>
                                {guestObj ? guestObj.name : room.type}
                              </div>
                              <div className={`text-[7px] md:text-[8px] font-black uppercase py-1.5 px-4 md:px-6 rounded-full border-2 border-current inline-block ${theme ? theme.status : ''}`}>{effectiveStatus}</div>
@@ -396,7 +411,7 @@ const App: React.FC = () => {
     <div className="w-20 h-20 bg-orange-600 rounded-[2.5rem] animate-bounce flex items-center justify-center text-3xl font-black shadow-[0_0_80px_rgba(249,115,22,0.4)]">HS</div>
     <div className="space-y-2 text-center">
       <p className="font-black uppercase tracking-[0.6em] text-xs text-orange-400">Sphere Engine</p>
-      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest animate-pulse">Initializing Global Node...</p>
+      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest animate-pulse">Initializing Node...</p>
     </div>
   </div>;
 
@@ -426,8 +441,8 @@ const App: React.FC = () => {
         </div>
         <div className="hidden lg:flex items-center gap-4 shrink-0 ml-auto">
            <div className="flex items-center gap-3 px-5 py-2.5 bg-white/5 rounded-2xl border border-white/10">
-              <div className={`w-2.5 h-2.5 rounded-full ${isCloudSyncing ? 'bg-amber-400 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.5)]' : 'bg-emerald-50 shadow-[0_0_10px_rgba(16,185,129,0.5)]'}`}></div>
-              <span className="text-[9px] font-black uppercase text-white/40 tracking-widest">{isCloudSyncing ? 'Syncing...' : 'Encrypted'}</span>
+              <div className={`w-2.5 h-2.5 rounded-full ${isCloudSyncing ? 'bg-amber-400 animate-pulse' : 'bg-emerald-50'}`}></div>
+              <span className="text-[9px] font-black uppercase text-white/40 tracking-widest">{isCloudSyncing ? 'Syncing...' : 'Ready'}</span>
            </div>
            <button onClick={() => setIsLoggedIn(false)} className="text-[10px] font-black uppercase bg-rose-600 hover:bg-rose-500 text-white px-8 py-3.5 rounded-2xl shadow-xl transition-all">EXIT</button>
         </div>
@@ -441,18 +456,12 @@ const App: React.FC = () => {
           <Stat label="Ready" count={rooms.filter(r=>r.status===RoomStatus.VACANT).length} color="text-emerald-500" onClick={() => setStatusFilter(RoomStatus.VACANT)} active={statusFilter === RoomStatus.VACANT} />
           <Stat label="In-Use" count={rooms.filter(r=>r.status===RoomStatus.OCCUPIED).length} color="text-orange-600" onClick={() => setStatusFilter(RoomStatus.OCCUPIED)} active={statusFilter === RoomStatus.OCCUPIED} />
           <Stat label="Laundry" count={rooms.filter(r=>r.status===RoomStatus.DIRTY).length} color="text-rose-500" onClick={() => setStatusFilter(RoomStatus.DIRTY)} active={statusFilter === RoomStatus.DIRTY} />
-          <Stat label="Repair" count={rooms.filter(r=>r.status===RoomStatus.REPAIR).length} color="text-[#5c2d0a]" onClick={() => setStatusFilter(RoomStatus.REPAIR)} active={statusFilter === RoomStatus.REPAIR} />
           <div className="h-8 w-px bg-slate-100 mx-2 shrink-0"></div>
           <FooterBtn label="Bill Archive" onClick={() => setShowGlobalArchive(true)} icon="📄" />
-          <FooterBtn label="WhatsApp Share" onClick={() => { setShowGlobalArchive(true); alert("Search for the guest and click 'Share WhatsApp' inside the record."); }} icon="💬" />
-          <FooterBtn label="Print Out" onClick={() => { setShowGlobalArchive(true); alert("Search for the guest and click 'Print' inside the record."); }} icon="🖨️" />
           <FooterBtn label="Cloud Sync" onClick={exportDatabase} icon="☁️" />
         </div>
         <div className="flex items-center gap-2 pr-4">
-           <a href="https://digitalcommunique.in/" target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-slate-300 hover:text-orange-500 transition-all uppercase tracking-widest flex items-center gap-2">
-              POWERED BY DIGITAL COMMUNIQUE PRIVATE LIMITED
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-           </a>
+           <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">HotelSphere Pro Authorized Node</p>
         </div>
       </footer>
 
@@ -460,9 +469,9 @@ const App: React.FC = () => {
         <RoomActionModal room={selectedRoom} onClose={() => setShowRoomActions(false)} onCheckIn={() => { setShowRoomActions(false); setShowCheckinForm(true); }} 
           onStatusUpdate={async (s) => {
             if (!selectedRoom.id) return;
-            const rs = rooms.map(r => r.id === selectedRoom.id ? { ...r, status: s } : r);
-            await db.rooms.put({ ...selectedRoom, status: s });
-            setRooms(rs);
+            const updated = { ...selectedRoom, status: s };
+            await db.rooms.put(updated);
+            setRooms(rooms.map(r => r.id === selectedRoom.id ? updated : r));
             setShowRoomActions(false);
           }} />
       )}
@@ -475,7 +484,7 @@ const App: React.FC = () => {
             const gId = data.guest.id || `G-${Date.now()}`;
             await db.guests.put({ ...data.guest, id: gId } as Guest);
             const bks = data.bookings.map(b => ({ ...b, id: `B-${Math.random().toString(36).substr(2, 5)}`, guestId: gId }));
-            await db.bookings.bulkPut(bks.filter(x => x.id));
+            await db.bookings.bulkPut(bks);
             await refreshLocalState();
             setShowReservationPipeline(true);
             setShowReservationForm(false);

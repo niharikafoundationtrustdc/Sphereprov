@@ -1,5 +1,5 @@
 
-import { RoomStatus, RoomType, Room } from './types';
+import { RoomStatus, Room } from './types';
 
 export const STATUS_COLORS: Record<RoomStatus, string> = {
   [RoomStatus.VACANT]: 'bg-white border-slate-200 text-slate-900 shadow-sm',
@@ -22,7 +22,6 @@ export const INDIAN_STATES = [
   "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
-// Helper to generate the specific room list provided in the image
 const generateBlockRooms = (prefix: string, blockName: string): Room[] => {
   const rooms: Room[] = [];
 
@@ -41,11 +40,12 @@ const generateBlockRooms = (prefix: string, blockName: string): Room[] => {
       rooms.push({
         id: `${prefix}${n}`,
         number: `${prefix}${n}`,
-        floor: parseInt(n[0]),
+        floor: n[0],
         type: type,
         price: price,
         status: RoomStatus.VACANT,
-        block: blockName
+        block: blockName,
+        bedType: 'Double Bed' // Defaulting initial rooms to Double Bed as per standard resort profile
       });
     });
   };
