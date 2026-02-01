@@ -231,7 +231,7 @@ const App: React.FC = () => {
       case 'ACCOUNTING': return <Accounting transactions={transactions} setTransactions={async (txs) => { setTransactions(txs); await db.transactions.bulkPut(txs); }} guests={guests} bookings={bookings} settings={settings} rooms={rooms} quotations={quotations} setQuotations={async (qs) => { setQuotations(qs); await db.quotations.bulkPut(qs); }} />;
       case 'PAYROLL': return <PayrollModule staff={supervisors} settings={settings} onUpdateTransactions={(tx) => { setTransactions([...transactions, tx]); db.transactions.put(tx); }} />;
       case 'REPORTS': return <Reports bookings={bookings} guests={guests} rooms={rooms} settings={settings} transactions={transactions} shiftLogs={[]} cleaningLogs={[]} quotations={quotations} />;
-      case 'SETTINGS': return <Settings settings={settings} setSettings={async (s)=>{await db.settings.put(s); setSettings(s);}} rooms={rooms} setRooms={async (rs)=>{setRooms(rs); await db.rooms.bulkPut(rs);}} supervisors={supervisors} setSupervisors={async (sups) => { setSupervisors(sups); await db.supervisors.bulkPut(sups); }} />;
+      case 'SETTINGS': return <Settings settings={settings} setSettings={async (s)=>{await db.settings.put(s); setSettings(s);}} rooms={rooms} setRooms={(rs)=>setRooms(rs)} supervisors={supervisors} setSupervisors={async (sups) => { setSupervisors(sups); await db.supervisors.bulkPut(sups); }} />;
       default:
         return (
           <div className="p-4 md:p-8 lg:p-10 pb-40 relative animate-in fade-in duration-700">
@@ -271,7 +271,7 @@ const App: React.FC = () => {
                       const statusColors: any = {
                         [RoomStatus.VACANT]: 'border-blue-900/20 text-blue-900',
                         [RoomStatus.OCCUPIED]: 'bg-blue-600 border-blue-900 text-white shadow-[0_10px_30px_rgba(30,64,175,0.2)]',
-                        [RoomStatus.RESERVED]: 'bg-orange-500 border-orange-700 text-white',
+                        [RoomStatus.RESERVED]: 'bg-orange-50 border-orange-700 text-white',
                         [RoomStatus.DIRTY]: 'bg-rose-100 border-rose-500 text-rose-900',
                         [RoomStatus.REPAIR]: 'bg-slate-200 border-slate-400 text-slate-500',
                       };
