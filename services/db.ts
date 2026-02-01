@@ -4,7 +4,7 @@ import {
   Room, Guest, Booking, Transaction, RoomShiftLog, CleaningLog, Quotation, HostelSettings, GroupProfile, Supervisor,
   BanquetHall, EventBooking, RestaurantOutlet, MenuItem, DiningTable, KOT, InventoryItem, Vendor, FacilityUsage, TravelBooking, StockReceipt, DiningBill, CateringItem, PayrollRecord, LeaveRequest
 } from '../types';
-import { pushToCloud, removeFromCloud } from './supabase';
+import { pushToCloud, removeFromCloud, IS_CLOUD_ENABLED } from './supabase';
 
 export class HotelSphereDB extends Dexie {
   rooms!: Table<Room>;
@@ -19,7 +19,6 @@ export class HotelSphereDB extends Dexie {
   supervisors!: Table<Supervisor>;
   payroll!: Table<PayrollRecord>;
   leaveRequests!: Table<LeaveRequest>;
-  
   banquetHalls!: Table<BanquetHall>;
   eventBookings!: Table<EventBooking>;
   cateringMenu!: Table<CateringItem>;
@@ -35,8 +34,9 @@ export class HotelSphereDB extends Dexie {
   stockReceipts!: Table<StockReceipt>;
 
   constructor() {
-    super('HotelSphereDB');
-    this.version(9).stores({
+    // New DB name 'Shubhkamna_Cloud_Engine' signifies moving away from local persistence
+    super('Shubhkamna_Cloud_Engine');
+    this.version(1).stores({
       rooms: 'id, number, status, type',
       guests: 'id, name, phone, email',
       bookings: 'id, bookingNo, roomId, guestId, status, checkInDate, checkOutDate, groupId',
@@ -76,20 +76,27 @@ export class HotelSphereDB extends Dexie {
       if (!table) return;
 
       table.hook('creating', (primKey: any, obj: any) => {
-        if (!obj.id && !primKey) return undefined;
-        setTimeout(() => pushToCloud(tableName, obj), 100);
+        if (IS_CLOUD_ENABLED) setTimeout(() => pushToCloud(tableName, obj), 50);
       });
 
       table.hook('updating', (mods: any, primKey: any, obj: any) => {
-        const merged = { ...obj, ...mods };
-        if (!merged.id) return undefined;
-        setTimeout(() => pushToCloud(tableName, merged), 100);
+        if (IS_CLOUD_ENABLED) {
+            const merged = { ...obj, ...mods };
+            setTimeout(() => pushToCloud(tableName, merged), 50);
+        }
       });
 
       table.hook('deleting', (primKey: any) => {
-        setTimeout(() => removeFromCloud(tableName, primKey), 100);
+        if (IS_CLOUD_ENABLED) setTimeout(() => removeFromCloud(tableName, primKey), 50);
       });
     });
+  }
+
+  async wipeCache() {
+    const tables = ['rooms', 'guests', 'bookings', 'transactions', 'settings', 'groups', 'supervisors', 'payroll', 'leaveRequests', 'banquetHalls', 'eventBookings', 'cateringMenu', 'restaurants', 'menuItems', 'diningTables', 'kots', 'diningBills', 'inventory', 'vendors', 'facilityUsage', 'travelBookings', 'stockReceipts'];
+    for (const t of tables) {
+      await (this as any)[t].clear();
+    }
   }
 }
 
@@ -105,30 +112,36 @@ export async function exportDatabase() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `hotelsphere_pro_full_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.download = `shubhkamna_cloud_backup_${new Date().toISOString().split('T')[0]}.json`;
   a.click();
 }
 
-export async function importDatabase(jsonFile: File) {
-  const reader = new FileReader();
+export async function importDatabase(file: File): Promise<any> {
   return new Promise((resolve, reject) => {
+    const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const data = JSON.parse(e.target?.result as string);
-        const tables = Object.keys(data);
-        await (db as any).transaction('rw', tables.map(t => (db as any)[t]), async () => {
-          for (const t of tables) {
-            if ((db as any)[t]) {
-              await (db as any)[t].clear();
-              await (db as any)[t].bulkPut(data[t].filter((item: any) => item.id));
+        const json = e.target?.result as string;
+        const data = JSON.parse(json);
+        for (const tableName in data) {
+          const table = (db as any)[tableName];
+          if (table && Array.isArray(data[tableName])) {
+            await table.clear();
+            await table.bulkPut(data[tableName]);
+            // If cloud is enabled, sync the imported data up
+            if (IS_CLOUD_ENABLED) {
+               for (const item of data[tableName]) {
+                  await pushToCloud(tableName, item);
+               }
             }
           }
-        });
+        }
         resolve(true);
       } catch (err) {
         reject(err);
       }
     };
-    reader.readAsText(jsonFile);
+    reader.onerror = (err) => reject(err);
+    reader.readAsText(file);
   });
 }

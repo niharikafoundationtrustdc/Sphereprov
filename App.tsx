@@ -87,21 +87,40 @@ const App: React.FC = () => {
     if (s) setSettings(s);
   }, []);
 
+  const clearSessionData = async () => {
+    await db.wipeCache();
+    setRooms([]);
+    setGuests([]);
+    setBookings([]);
+    setTransactions([]);
+    setGroups([]);
+    setSupervisors([]);
+    setQuotations([]);
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('portal') === 'guest') { setIsGuestPortal(true); }
 
     const init = async () => {
       try {
+        // ENFORCED: Wipe local cache on every boot to satisfy "Do not store locally"
+        await db.wipeCache();
+
         const tables = ['rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'settings'];
+        
         if (IS_CLOUD_ENABLED) {
+          console.log("Enterprise Sync Active: Pulling fresh cloud snapshot...");
           for (const table of tables) {
             const cloudData = await pullFromCloud(table);
-            if (cloudData.length > 0) { await (db as any)[table].bulkPut(cloudData); }
+            if (cloudData.length > 0) { 
+              await (db as any)[table].bulkPut(cloudData); 
+            }
           }
         }
         
         const existingRooms = await db.rooms.toArray();
+        // If Cloud is empty or disabled, we seed the image-based inventory for the session
         if (existingRooms.length === 0) {
           await db.rooms.bulkPut(INITIAL_ROOMS);
         }
@@ -124,6 +143,12 @@ const App: React.FC = () => {
     };
     init();
   }, [refreshLocalState]);
+
+  const handleLogout = async () => {
+    await clearSessionData();
+    setIsLoggedIn(false);
+    window.location.reload(); // Hard refresh to ensure no memory remains
+  };
 
   const handleLogin = (role: UserRole, supervisor?: Supervisor) => {
     setCurrentUserRole(role);
@@ -159,7 +184,7 @@ const App: React.FC = () => {
   const roomsByBlock = useMemo(() => {
     const filtered = statusFilter === 'ALL' ? rooms : rooms.filter(r => r.status === statusFilter);
     return filtered.reduce((acc, room) => {
-      const blockKey = room.block || 'Main';
+      const blockKey = room.block || 'Ayodhya';
       if (!acc[blockKey]) acc[blockKey] = [];
       acc[blockKey].push(room);
       return acc;
@@ -260,13 +285,13 @@ const App: React.FC = () => {
 
             {Object.entries(roomsByBlock).sort().map(([block, blockRooms]) => {
               const isAyodhya = block === 'Ayodhya';
-              const themeColor = isAyodhya ? 'text-blue-900' : 'text-orange-600';
-              let blockIcon = isAyodhya ? '🔱' : '🚩';
+              const blockTheme = isAyodhya ? 'text-blue-900' : 'text-orange-600';
+              const blockIcon = isAyodhya ? '🔱' : '🚩';
 
               return (
                 <div key={block} className="mb-14">
-                  <h3 className={`text-[13px] font-black uppercase mb-8 tracking-[0.3em] flex items-center gap-4 ${themeColor}/60`}>
-                    <span className={`w-12 h-1 ${isAyodhya ? 'bg-blue-900' : 'bg-orange-500'} opacity-20`}></span>
+                  <h3 className={`text-[13px] font-black uppercase mb-8 tracking-[0.3em] flex items-center gap-4 ${blockTheme}`}>
+                    <span className={`w-12 h-1 ${isAyodhya ? 'bg-blue-900' : 'bg-orange-600'} opacity-20`}></span>
                     {blockIcon} {block} Block
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-5 md:gap-8">
@@ -279,9 +304,9 @@ const App: React.FC = () => {
                       const isSelected = selectedRoomIds.has(room.id);
 
                       const statusColors: any = {
-                        [RoomStatus.VACANT]: isAyodhya ? 'border-blue-900/20 text-blue-900' : 'border-orange-500/20 text-orange-600',
-                        [RoomStatus.OCCUPIED]: isAyodhya ? 'bg-blue-600 border-blue-900 text-white shadow-[0_10px_30px_rgba(30,64,175,0.2)]' : 'bg-orange-600 border-orange-700 text-white shadow-[0_10px_30px_rgba(234,88,12,0.2)]',
-                        [RoomStatus.RESERVED]: 'bg-slate-50 border-slate-700 text-slate-900',
+                        [RoomStatus.VACANT]: isAyodhya ? 'border-blue-900/40 text-blue-900' : 'border-orange-600/40 text-orange-600',
+                        [RoomStatus.OCCUPIED]: isAyodhya ? 'bg-blue-900 border-blue-900 text-white' : 'bg-orange-600 border-orange-700 text-white',
+                        [RoomStatus.RESERVED]: 'bg-slate-50 border-slate-300 text-slate-500',
                         [RoomStatus.DIRTY]: 'bg-rose-100 border-rose-500 text-rose-900',
                         [RoomStatus.REPAIR]: 'bg-slate-200 border-slate-400 text-slate-500',
                       };
@@ -290,20 +315,19 @@ const App: React.FC = () => {
                         <button key={room.id} onClick={() => {
                             if (isSelectionMode) {
                               if (status === RoomStatus.VACANT || status === RoomStatus.DIRTY) toggleRoomSelection(room.id);
-                              else alert("Only vacant units can be selected.");
+                              else alert("Only vacant/dirty units can be selected.");
                             } else {
                               if (activeB || resToday) setActiveBookingId((activeB || resToday)!.id);
                               else { setSelectedRoom(room); setShowRoomActions(true); }
                             }
                           }} 
-                          className={`min-h-[190px] blue-orange-card rounded-[2.8rem] p-6 flex flex-col items-center justify-between relative group ${isSelected ? 'ring-8 ring-orange-500/30 scale-105 z-10' : statusColors[status]}`}
-                          style={!isSelected && status === RoomStatus.VACANT ? { borderColor: isAyodhya ? '#1e40af33' : '#ea580c33' } : {}}
+                          className={`min-h-[190px] rounded-[2.8rem] border-2 p-6 flex flex-col items-center justify-between relative group transition-all shadow-sm ${isSelected ? 'ring-8 ring-orange-500/30 scale-105 z-10' : statusColors[status]}`}
                         >
                           {isSelected && <div className="absolute -top-3 -right-3 w-10 h-10 bg-orange-600 text-white rounded-2xl flex items-center justify-center text-xs font-black shadow-xl border-4 border-white">✓</div>}
                           
                           <div className="flex flex-col items-center gap-1">
                              <span className="text-3xl md:text-4xl font-black tracking-tighter uppercase leading-none">{room.number}</span>
-                             <p className="text-[9px] font-black uppercase opacity-60 tracking-widest">{room.bedType}</p>
+                             <p className="text-[9px] font-black uppercase opacity-60 tracking-widest">{room.floor}</p>
                           </div>
 
                           <div className="text-center w-full">
@@ -330,7 +354,7 @@ const App: React.FC = () => {
     <div className="w-24 h-24 bg-orange-600 rounded-[2rem] animate-bounce flex items-center justify-center text-3xl font-black text-white shadow-2xl">HS</div>
     <div className="space-y-2 text-center">
       <p className="font-black uppercase tracking-[0.6em] text-sm text-blue-900">Sphere Engine</p>
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">Synchronizing Records...</p>
+      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">Establishing Secure Session...</p>
     </div>
   </div>;
 
@@ -346,7 +370,7 @@ const App: React.FC = () => {
           ))}
         </div>
         <div className="hidden lg:flex items-center gap-4 ml-auto shrink-0">
-           <button onClick={() => setIsLoggedIn(false)} className="text-[11px] font-black uppercase bg-orange-600 text-white px-8 py-3.5 rounded-2xl transition-all shadow-lg hover:bg-black">EXIT PORTAL</button>
+           <button onClick={handleLogout} className="text-[11px] font-black uppercase bg-slate-100 text-slate-400 px-8 py-3.5 rounded-2xl transition-all hover:bg-orange-600 hover:text-white">CLOSE SESSION</button>
         </div>
       </nav>
 
@@ -361,10 +385,15 @@ const App: React.FC = () => {
           <Stat label="REPAIR" count={rooms.filter(r=>r.status===RoomStatus.REPAIR).length} color="text-slate-500" onClick={() => setStatusFilter(RoomStatus.REPAIR)} active={statusFilter === RoomStatus.REPAIR} />
         </div>
         
-        {/* Connection Status Badge */}
-        <div className={`px-4 py-2 rounded-xl flex items-center gap-3 border-2 shrink-0 ${IS_CLOUD_ENABLED ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-rose-50 border-rose-500 text-rose-700'}`}>
-           <div className={`w-2 h-2 rounded-full ${IS_CLOUD_ENABLED ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
-           <span className="text-[10px] font-black uppercase tracking-widest">{IS_CLOUD_ENABLED ? 'Cloud Online' : 'Local Only'}</span>
+        {/* REPLACED: NEW ENTERPRISE SYNC INDICATOR */}
+        <div className={`px-6 py-2.5 rounded-[1.2rem] flex items-center gap-4 border-2 shadow-sm transition-all ${IS_CLOUD_ENABLED ? 'bg-emerald-50 border-emerald-500/30 text-emerald-700' : 'bg-blue-50 border-blue-500/30 text-blue-700'}`}>
+           <div className="flex gap-1">
+              <div className={`w-2 h-2 rounded-full ${IS_CLOUD_ENABLED ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${IS_CLOUD_ENABLED ? 'bg-emerald-500 animate-pulse delay-75' : 'bg-blue-500'}`}></div>
+           </div>
+           <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+              {IS_CLOUD_ENABLED ? 'Live Enterprise Sync Active' : 'Session Cache Mode'}
+           </span>
         </div>
 
         <div className="flex items-center gap-4 shrink-0">
