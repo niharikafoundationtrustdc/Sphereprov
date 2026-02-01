@@ -14,14 +14,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, settings, supervisors }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      if (document.exitFullscreen) document.exitFullscreen();
-    }
-  };
-
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const normalizedId = username.trim().toLowerCase();
@@ -51,51 +43,91 @@ const Login: React.FC<LoginProps> = ({ onLogin, settings, supervisors }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#1a0f00] flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <button onClick={toggleFullscreen} className="fixed top-8 right-8 z-50 bg-white/10 hover:bg-white/20 text-white p-4 rounded-2xl border border-white/20 transition-all flex items-center gap-3 shadow-2xl backdrop-blur-md">
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-        <span className="text-[10px] font-black uppercase tracking-widest hidden md:inline">Fullscreen</span>
-      </button>
-
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-orange-600/10 rounded-full blur-[150px]"></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-orange-400/5 rounded-full blur-[150px]"></div>
-
-      <div className="bg-white w-full max-w-xl rounded-[4rem] shadow-2xl p-10 md:p-16 space-y-10 animate-in zoom-in duration-500 relative z-10 border border-slate-100">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+      <div className="w-full max-w-lg space-y-12 animate-in zoom-in duration-500 relative z-10">
+        
+        {/* Branding Area */}
         <div className="text-center space-y-4">
-          <div className="w-20 h-20 bg-orange-600 rounded-3xl flex items-center justify-center text-white text-3xl font-black mx-auto shadow-2xl">HS</div>
+          <div className="w-24 h-24 bg-[#e65c00] rounded-3xl flex items-center justify-center text-white text-4xl font-black mx-auto shadow-[0_20px_50px_rgba(230,92,0,0.3)]">
+            HS
+          </div>
           <div>
-            <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none">Hotel Sphere Pro</h2>
-            <p className="text-[10px] font-black text-orange-600 uppercase tracking-[0.4em] mt-2">Sphere Cloud Identity</p>
+            <h1 className="text-4xl font-black text-[#1a2b4b] uppercase tracking-tight leading-none">HOTEL SPHERE PRO</h1>
+            <p className="text-[11px] font-black text-[#e65c00] uppercase tracking-[0.4em] mt-3">SPHERE CLOUD IDENTITY</p>
           </div>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-8">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest text-center block">Select Module Access</label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {(['SUPERADMIN', 'ADMIN', 'RECEPTIONIST', 'ACCOUNTANT', 'MANAGER', 'WAITER', 'CHEF'] as UserRole[]).map(role => (
-                <button key={role} type="button" onClick={() => { setSelectedRole(role); setError(''); }} className={`py-3 rounded-xl font-black text-[8px] uppercase border-2 transition-all ${selectedRole === role ? 'bg-orange-600 border-orange-600 text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-orange-100'}`}>
-                  {role === 'CHEF' ? 'KITCHEN' : role}
-                </button>
-              ))}
+        {/* Access Selection */}
+        <div className="space-y-4">
+          <p className="text-[11px] font-black uppercase text-slate-400 tracking-widest text-center">SELECT MODULE ACCESS</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {(['SUPERADMIN', 'ADMIN', 'RECEPTIONIST', 'ACCOUNTANT', 'MANAGER', 'WAITER', 'CHEF'] as UserRole[]).map(role => (
+              <button 
+                key={role} 
+                type="button" 
+                onClick={() => { setSelectedRole(role); setError(''); }} 
+                className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase transition-all duration-300 border ${
+                  selectedRole === role 
+                    ? 'bg-[#e65c00] border-[#e65c00] text-white shadow-[0_10px_20px_rgba(230,92,0,0.2)] scale-105' 
+                    : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50 hover:border-slate-200'
+                }`}
+              >
+                {role === 'CHEF' ? 'KITCHEN' : role}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Form Container */}
+        <form onSubmit={handleLogin} className="space-y-8 bg-white p-2 rounded-[2rem]">
+          <div className="space-y-6 px-4 py-8">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">LOGIN IDENTITY</label>
+              <input 
+                type="text" 
+                required 
+                className="w-full bg-slate-50 border-2 border-transparent focus:border-[#e65c00] p-5 rounded-2xl font-black text-xs text-slate-900 outline-none transition-all shadow-inner uppercase" 
+                value={username} 
+                onChange={e => setUsername(e.target.value)} 
+              />
             </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">SECRET KEY</label>
+              <input 
+                type="password" 
+                required 
+                className="w-full bg-slate-50 border-2 border-transparent focus:border-[#e65c00] p-5 rounded-2xl font-black text-xs text-slate-900 outline-none transition-all shadow-inner" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+              />
+            </div>
+            {error && (
+              <div className="bg-red-50 p-4 rounded-2xl border border-red-100 animate-bounce">
+                <p className="text-[10px] font-black text-red-600 uppercase text-center">{error}</p>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Login Identity</label>
-              <input type="text" required autoComplete="username" className="w-full border-2 p-4 rounded-2xl font-black text-xs bg-slate-50 focus:bg-white focus:border-orange-600 outline-none transition-all shadow-inner text-black uppercase" value={username} onChange={e => setUsername(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Secret Key</label>
-              <input type="password" required autoComplete="current-password" className="w-full border-2 p-4 rounded-2xl font-black text-xs bg-slate-50 focus:bg-white focus:border-orange-600 outline-none transition-all shadow-inner text-black" value={password} onChange={e => setPassword(e.target.value)} />
-            </div>
-            {error && <div className="bg-red-50 p-3 rounded-xl border border-red-100"><p className="text-[10px] font-black text-red-600 uppercase text-center">{error}</p></div>}
-          </div>
-
-          <button type="submit" className="w-full bg-orange-600 text-white py-6 rounded-3xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:bg-black transition-all">Unlock Terminal</button>
+          <button 
+            type="submit" 
+            className="w-full bg-[#e65c00] text-white py-6 rounded-3xl font-black uppercase text-[13px] tracking-[0.2em] shadow-[0_20px_40px_rgba(230,92,0,0.3)] hover:brightness-110 active:scale-[0.98] transition-all"
+          >
+            UNLOCK TERMINAL
+          </button>
         </form>
-        <p className="text-center text-[10px] font-black text-slate-400 uppercase opacity-40">Enterprise v5.1 Authorization Logic</p>
+
+        <div className="text-center space-y-2">
+          <a 
+            href="https://digitalcommunique.in/" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-[11px] font-black text-slate-400 hover:text-[#e65c00] transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+          >
+            POWERED BY DIGITAL COMMUNIQUE PRIVATE LIMITED
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+          </a>
+          <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest opacity-50">Enterprise Cloud Hosting Authorized</p>
+        </div>
       </div>
     </div>
   );

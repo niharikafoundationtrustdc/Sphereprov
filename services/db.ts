@@ -2,7 +2,7 @@
 import { Dexie, type Table } from 'dexie';
 import { 
   Room, Guest, Booking, Transaction, RoomShiftLog, CleaningLog, Quotation, HostelSettings, GroupProfile, Supervisor,
-  BanquetHall, EventBooking, RestaurantOutlet, MenuItem, DiningTable, KOT, InventoryItem, Vendor, FacilityUsage, TravelBooking, StockReceipt, DiningBill, CateringItem, PayrollRecord
+  BanquetHall, EventBooking, RestaurantOutlet, MenuItem, DiningTable, KOT, InventoryItem, Vendor, FacilityUsage, TravelBooking, StockReceipt, DiningBill, CateringItem, PayrollRecord, LeaveRequest
 } from '../types';
 import { pushToCloud, removeFromCloud } from './supabase';
 
@@ -18,6 +18,7 @@ export class HotelSphereDB extends Dexie {
   groups!: Table<GroupProfile>;
   supervisors!: Table<Supervisor>;
   payroll!: Table<PayrollRecord>;
+  leaveRequests!: Table<LeaveRequest>;
   
   banquetHalls!: Table<BanquetHall>;
   eventBookings!: Table<EventBooking>;
@@ -35,7 +36,7 @@ export class HotelSphereDB extends Dexie {
 
   constructor() {
     super('HotelSphereDB');
-    this.version(8).stores({
+    this.version(9).stores({
       rooms: 'id, number, status, type',
       guests: 'id, name, phone, email',
       bookings: 'id, bookingNo, roomId, guestId, status, checkInDate, checkOutDate, groupId',
@@ -47,6 +48,7 @@ export class HotelSphereDB extends Dexie {
       groups: 'id, groupName, headName, status',
       supervisors: 'id, loginId, name, status',
       payroll: 'id, staffId, month',
+      leaveRequests: 'id, staffId, status',
       banquetHalls: 'id, name',
       eventBookings: 'id, date, hallId, guestId, status',
       cateringMenu: 'id, name, category',
@@ -63,7 +65,7 @@ export class HotelSphereDB extends Dexie {
     });
 
     const tablesToSync = [
-      'rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'payroll',
+      'rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'payroll', 'leaveRequests',
       'banquetHalls', 'eventBookings', 'cateringMenu', 'restaurants', 
       'menuItems', 'diningTables', 'kots', 'diningBills', 'inventory', 
       'vendors', 'facilityUsage', 'travelBookings', 'stockReceipts', 'settings'
@@ -74,19 +76,13 @@ export class HotelSphereDB extends Dexie {
       if (!table) return;
 
       table.hook('creating', (primKey: any, obj: any) => {
-        if (!obj.id && !primKey) {
-          console.warn(`[DB HOOK] Creation aborted for ${tableName}: Missing ID.`);
-          return undefined;
-        }
+        if (!obj.id && !primKey) return undefined;
         setTimeout(() => pushToCloud(tableName, obj), 100);
       });
 
       table.hook('updating', (mods: any, primKey: any, obj: any) => {
         const merged = { ...obj, ...mods };
-        if (!merged.id) {
-           console.warn(`[DB HOOK] Update aborted for ${tableName}: Missing ID.`);
-           return undefined;
-        }
+        if (!merged.id) return undefined;
         setTimeout(() => pushToCloud(tableName, merged), 100);
       });
 
@@ -100,7 +96,7 @@ export class HotelSphereDB extends Dexie {
 export const db = new HotelSphereDB();
 
 export async function exportDatabase() {
-  const tables = ['rooms', 'guests', 'bookings', 'transactions', 'settings', 'groups', 'supervisors', 'payroll', 'banquetHalls', 'eventBookings', 'cateringMenu', 'restaurants', 'menuItems', 'diningTables', 'kots', 'diningBills', 'inventory', 'vendors', 'facilityUsage', 'travelBookings', 'stockReceipts'];
+  const tables = ['rooms', 'guests', 'bookings', 'transactions', 'settings', 'groups', 'supervisors', 'payroll', 'leaveRequests', 'banquetHalls', 'eventBookings', 'cateringMenu', 'restaurants', 'menuItems', 'diningTables', 'kots', 'diningBills', 'inventory', 'vendors', 'facilityUsage', 'travelBookings', 'stockReceipts'];
   const data: any = {};
   for (const t of tables) {
     data[t] = await (db as any)[t].toArray();

@@ -55,7 +55,7 @@ const App: React.FC = () => {
   
   const [settings, setSettings] = useState<HostelSettings>({
     name: 'Hotel Sphere Pro',
-    address: 'Powered by Digital Communique',
+    address: 'Digital Communique Private Limited',
     agents: [{ name: 'Direct', commission: 0 }],
     roomTypes: ['DELUXE ROOM', 'BUDGET ROOM', 'STANDARD ROOM', 'AC FAMILY ROOM'],
     mealPlans: ['EP (Room Only)', 'CP (Breakfast)', 'MAP (Half Board)', 'AP (Full Board)'],
@@ -322,6 +322,7 @@ const App: React.FC = () => {
                     <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedRoomIds(new Set()); }} className={`flex-1 px-6 lg:px-8 py-4 rounded-2xl font-black text-[10px] md:text-[11px] uppercase shadow-lg transition-all border-2 ${isSelectionMode ? 'bg-orange-500 border-orange-500 text-white animate-pulse shadow-orange-200' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
                       {isSelectionMode ? 'EXIT MULTI' : 'MULTI CHECK-IN'}
                     </button>
+                    <button onClick={() => { setIsGuestPortal(true); }} className="flex-1 bg-blue-900 text-white px-6 lg:px-8 py-4 rounded-2xl font-black text-[10px] md:text-[11px] uppercase shadow-lg hover:bg-black transition-all">60s EXPRESS</button>
                     <button onClick={() => setShowReservationForm(true)} className="flex-[1.5] bg-orange-600 text-white px-8 lg:px-12 py-4 rounded-2xl font-black text-[10px] md:text-[11px] uppercase shadow-2xl shadow-orange-200 hover:bg-slate-900 hover:-translate-y-0.5 transition-all">+ RESERVATION</button>
                   </div>
                </div>
@@ -386,6 +387,7 @@ const App: React.FC = () => {
 
   if (isGuestPortal) return <GuestPortal settings={settings} allRooms={rooms} onCheckinComplete={() => {
     refreshLocalState();
+    setIsGuestPortal(false);
   }} />;
 
   if (!isLoggedIn) return <Login onLogin={handleLogin} settings={settings} supervisors={supervisors} />;
@@ -402,7 +404,7 @@ const App: React.FC = () => {
         </div>
         <div className="hidden lg:flex items-center gap-4 shrink-0 ml-auto">
            <div className="flex items-center gap-3 px-5 py-2.5 bg-white/5 rounded-2xl border border-white/10">
-              <div className={`w-2.5 h-2.5 rounded-full ${isCloudSyncing ? 'bg-amber-400 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.5)]' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]'}`}></div>
+              <div className={`w-2.5 h-2.5 rounded-full ${isCloudSyncing ? 'bg-amber-400 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.5)]' : 'bg-emerald-50 shadow-[0_0_10px_rgba(16,185,129,0.5)]'}`}></div>
               <span className="text-[9px] font-black uppercase text-white/40 tracking-widest">{isCloudSyncing ? 'Syncing...' : 'Encrypted'}</span>
            </div>
            <button onClick={() => setIsLoggedIn(false)} className="text-[10px] font-black uppercase bg-rose-600 hover:bg-rose-500 text-white px-8 py-3.5 rounded-2xl shadow-xl transition-all">EXIT</button>
@@ -418,19 +420,17 @@ const App: React.FC = () => {
           <Stat label="In-Use" count={rooms.filter(r=>r.status===RoomStatus.OCCUPIED).length} color="text-orange-600" onClick={() => setStatusFilter(RoomStatus.OCCUPIED)} active={statusFilter === RoomStatus.OCCUPIED} />
           <Stat label="Laundry" count={rooms.filter(r=>r.status===RoomStatus.DIRTY).length} color="text-rose-500" onClick={() => setStatusFilter(RoomStatus.DIRTY)} active={statusFilter === RoomStatus.DIRTY} />
           <Stat label="Repair" count={rooms.filter(r=>r.status===RoomStatus.REPAIR).length} color="text-[#5c2d0a]" onClick={() => setStatusFilter(RoomStatus.REPAIR)} active={statusFilter === RoomStatus.REPAIR} />
-          <Stat label="Maint" count={rooms.filter(r=>r.status===RoomStatus.MANAGEMENT).length} color="text-violet-600" onClick={() => setStatusFilter(RoomStatus.MANAGEMENT)} active={statusFilter === RoomStatus.MANAGEMENT} />
           <div className="h-8 w-px bg-slate-100 mx-2 shrink-0"></div>
           <FooterBtn label="Bill Archive" onClick={() => setShowGlobalArchive(true)} icon="📄" />
-          <FooterBtn label="Share WhatsApp" onClick={() => { 
-            // Simple logic: open global archive to search guest to share
-            setShowGlobalArchive(true);
-            alert("Open any record in the archive to share via WhatsApp.");
-          }} icon="💬" />
-          <FooterBtn label="Print Out" onClick={() => {
-            setShowGlobalArchive(true);
-            alert("Open any record in the archive to generate a print-out.");
-          }} icon="🖨️" />
+          <FooterBtn label="WhatsApp Share" onClick={() => { setShowGlobalArchive(true); alert("Search for the guest and click 'Share WhatsApp' inside the record."); }} icon="💬" />
+          <FooterBtn label="Print Out" onClick={() => { setShowGlobalArchive(true); alert("Search for the guest and click 'Print' inside the record."); }} icon="🖨️" />
           <FooterBtn label="Cloud Sync" onClick={exportDatabase} icon="☁️" />
+        </div>
+        <div className="flex items-center gap-2 pr-4">
+           <a href="https://digitalcommunique.in/" target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-slate-300 hover:text-orange-500 transition-all uppercase tracking-widest flex items-center gap-2">
+              POWERED BY DIGITAL COMMUNIQUE PRIVATE LIMITED
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+           </a>
         </div>
       </footer>
 
