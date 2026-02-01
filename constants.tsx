@@ -22,43 +22,76 @@ export const INDIAN_STATES = [
   "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
-const generateBlockRooms = (prefix: string, blockName: string): Room[] => {
+const generateAyodhyaRooms = (): Room[] => {
   const rooms: Room[] = [];
+  const block = 'Ayodhya';
+  const prefix = 'A';
 
-  const deluxeNumbers = [
-    '101','102','103','104','105','106', 
+  const deluxe = [
+    '101','102','103','104','105','106',
     '211','212','214','215','216',
-    '311','312','314','315','316','317','318','319','320', 
+    '311','312','314','315','316','317','318','319','320',
     '321','322','323','324','325','326','327','328','329','330','331','332'
   ];
-  const premiumNumbers = ['202','204','205','206','207','208','302','304','305','306','307','308'];
-  const superPremiumNumbers = ['203','210','303','310'];
-  const suiteNumbers = ['201','209','301','309'];
+  const premium = ['202','204','205','206','207','208','302','304','305','306','307','308'];
+  const superPremium = ['203','210','303','310'];
+  const suite = ['201','209','301','309'];
 
   const add = (nums: string[], type: string, price: number) => {
     nums.forEach(n => {
       rooms.push({
         id: `${prefix}${n}`,
         number: `${prefix}${n}`,
-        floor: n[0],
+        floor: `${n[0]}st Floor`,
         type: type,
         price: price,
         status: RoomStatus.VACANT,
-        block: blockName,
-        bedType: 'Double Bed' // Defaulting initial rooms to Double Bed as per standard resort profile
+        block: block,
+        bedType: 'Double Bed'
       });
     });
   };
 
-  add(deluxeNumbers, 'DELUXE ROOM', 2900);
-  add(premiumNumbers, 'PREMIUM ROOM', 3500);
-  add(superPremiumNumbers, 'SUPER PREMIUM ROOM', 4500);
-  add(suiteNumbers, 'SUITE ROOM', 6500);
+  add(deluxe, 'DELUXE ROOM', 2200);
+  add(premium, 'PREMIUM ROOM', 2700);
+  add(superPremium, 'SUPER PREMIUM ROOM', 3200);
+  add(suite, 'SUITE ROOM', 3600);
+
+  return rooms;
+};
+
+const generateMithilaRooms = (): Room[] => {
+  const rooms: Room[] = [];
+  const block = 'Mithila';
+  const prefix = 'M';
+
+  const deluxe = ['201','202','203','204','301','302','303','304','401','402','403','404'];
+  const premium = ['101','102','205','305','405'];
+  const superDeluxe = ['306','307','308','309','310','311','406','407','408','409','410','411'];
+
+  const add = (nums: string[], type: string, price: number) => {
+    nums.forEach(n => {
+      rooms.push({
+        id: `${prefix}${n}`,
+        number: `${prefix}${n}`,
+        floor: `${n[0]}st Floor`,
+        type: type,
+        price: price,
+        status: RoomStatus.VACANT,
+        block: block,
+        bedType: 'Double Bed'
+      });
+    });
+  };
+
+  add(deluxe, 'DELUXE ROOM', 2200);
+  add(premium, 'PREMIUM ROOM', 2700);
+  add(superDeluxe, 'SUPER DELUXE ROOM', 2400);
 
   return rooms;
 };
 
 export const INITIAL_ROOMS: Room[] = [
-  ...generateBlockRooms('A', 'Ayodhya'),
-  ...generateBlockRooms('M', 'Mithila')
+  ...generateAyodhyaRooms(),
+  ...generateMithilaRooms()
 ];

@@ -43,15 +43,15 @@ const App: React.FC = () => {
     name: 'Shubhkamna Hotel And Resort',
     address: 'Ayodhya',
     agents: [{ name: 'Direct', commission: 0 }],
-    roomTypes: ['DELUXE ROOM', 'PREMIUM ROOM', 'SUPER PREMIUM ROOM', 'SUITE ROOM'],
+    roomTypes: ['DELUXE ROOM', 'SUPER DELUXE ROOM', 'PREMIUM ROOM', 'SUPER PREMIUM ROOM', 'SUITE ROOM'],
     mealPlans: ['EP (Room Only)', 'CP (Breakfast)', 'MAP (Half Board)', 'AP (Full Board)'],
-    floors: ['1st Floor', '2nd Floor', '3rd Floor'],
+    floors: ['1st Floor', '2nd Floor', '3rd Floor', '4th Floor'],
     blocks: [
       { id: 'b1', name: 'Ayodhya', prefix: 'A', color: 'blue' },
       { id: 'b2', name: 'Mithila', prefix: 'M', color: 'orange' }
     ],
     bedTypes: ['Single Bed', 'Double Bed'],
-    taxRate: 12,
+    taxRate: 5,
     wifiPassword: 'hotelsphere123',
     receptionPhone: '9',
     roomServicePhone: '8'
@@ -101,7 +101,11 @@ const App: React.FC = () => {
           }
         }
         
-        // Removed auto-seeding logic to respect "Delete all rooms I will add my self"
+        const existingRooms = await db.rooms.toArray();
+        if (existingRooms.length === 0) {
+          await db.rooms.bulkPut(INITIAL_ROOMS);
+        }
+        
         await refreshLocalState();
         
         if (IS_CLOUD_ENABLED) {
@@ -243,7 +247,7 @@ const App: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-center mb-10 lg:mb-14 gap-6 glass-card p-10 rounded-[3rem] shadow-2xl border-2 border-blue-900/10">
                <div className="flex flex-col gap-1 text-center md:text-left">
                  <h1 className="text-3xl md:text-5xl font-black text-blue-900 uppercase tracking-tighter leading-none">{settings.name}</h1>
-                 <p className="text-[10px] md:text-[12px] font-black text-orange-500 uppercase tracking-[0.4em] ml-1">Cloud Command Console</p>
+                 <p className="text-[10px] md:text-[12px] font-black text-orange-500 uppercase tracking-[0.4em] ml-1">Property Hub Console</p>
                </div>
                <div className="flex flex-wrap gap-4 justify-center">
                   <button onClick={() => setShowReservationPipeline(true)} className="bg-white text-blue-900 border-2 border-blue-900 px-8 py-4 rounded-2xl font-black text-[11px] uppercase shadow-lg hover:bg-blue-900 hover:text-white transition-all">Reservations</button>
@@ -256,16 +260,17 @@ const App: React.FC = () => {
 
             {Object.entries(roomsByBlock).sort().map(([block, blockRooms]) => {
               const isAyodhya = block === 'Ayodhya';
+              const themeColor = isAyodhya ? 'text-blue-900' : 'text-orange-600';
               let blockIcon = isAyodhya ? '🔱' : '🚩';
 
               return (
                 <div key={block} className="mb-14">
-                  <h3 className={`text-[13px] font-black uppercase mb-8 tracking-[0.3em] flex items-center gap-4 text-blue-900/60`}>
-                    <span className="w-12 h-1 bg-current opacity-20"></span>
+                  <h3 className={`text-[13px] font-black uppercase mb-8 tracking-[0.3em] flex items-center gap-4 ${themeColor}/60`}>
+                    <span className={`w-12 h-1 ${isAyodhya ? 'bg-blue-900' : 'bg-orange-500'} opacity-20`}></span>
                     {blockIcon} {block} Block
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-5 md:gap-8">
-                    {blockRooms.sort((a,b) => a.number.localeCompare(b.number)).map(room => {
+                    {blockRooms.sort((a,b) => a.number.localeCompare(b.number, undefined, {numeric: true})).map(room => {
                       const today = new Date().toISOString().split('T')[0];
                       const activeB = bookings.find(b => b.roomId === room.id && b.status === 'ACTIVE');
                       const resToday = bookings.find(b => b.roomId === room.id && b.status === 'RESERVED' && b.checkInDate === today);
@@ -274,9 +279,9 @@ const App: React.FC = () => {
                       const isSelected = selectedRoomIds.has(room.id);
 
                       const statusColors: any = {
-                        [RoomStatus.VACANT]: 'border-blue-900/20 text-blue-900',
-                        [RoomStatus.OCCUPIED]: 'bg-blue-600 border-blue-900 text-white shadow-[0_10px_30px_rgba(30,64,175,0.2)]',
-                        [RoomStatus.RESERVED]: 'bg-orange-50 border-orange-700 text-white',
+                        [RoomStatus.VACANT]: isAyodhya ? 'border-blue-900/20 text-blue-900' : 'border-orange-500/20 text-orange-600',
+                        [RoomStatus.OCCUPIED]: isAyodhya ? 'bg-blue-600 border-blue-900 text-white shadow-[0_10px_30px_rgba(30,64,175,0.2)]' : 'bg-orange-600 border-orange-700 text-white shadow-[0_10px_30px_rgba(234,88,12,0.2)]',
+                        [RoomStatus.RESERVED]: 'bg-slate-50 border-slate-700 text-slate-900',
                         [RoomStatus.DIRTY]: 'bg-rose-100 border-rose-500 text-rose-900',
                         [RoomStatus.REPAIR]: 'bg-slate-200 border-slate-400 text-slate-500',
                       };
@@ -292,6 +297,7 @@ const App: React.FC = () => {
                             }
                           }} 
                           className={`min-h-[190px] blue-orange-card rounded-[2.8rem] p-6 flex flex-col items-center justify-between relative group ${isSelected ? 'ring-8 ring-orange-500/30 scale-105 z-10' : statusColors[status]}`}
+                          style={!isSelected && status === RoomStatus.VACANT ? { borderColor: isAyodhya ? '#1e40af33' : '#ea580c33' } : {}}
                         >
                           {isSelected && <div className="absolute -top-3 -right-3 w-10 h-10 bg-orange-600 text-white rounded-2xl flex items-center justify-center text-xs font-black shadow-xl border-4 border-white">✓</div>}
                           
@@ -324,7 +330,7 @@ const App: React.FC = () => {
     <div className="w-24 h-24 bg-orange-600 rounded-[2rem] animate-bounce flex items-center justify-center text-3xl font-black text-white shadow-2xl">HS</div>
     <div className="space-y-2 text-center">
       <p className="font-black uppercase tracking-[0.6em] text-sm text-blue-900">Sphere Engine</p>
-      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">Initializing Portal...</p>
+      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">Synchronizing Records...</p>
     </div>
   </div>;
 
@@ -358,7 +364,7 @@ const App: React.FC = () => {
         {/* Connection Status Badge */}
         <div className={`px-4 py-2 rounded-xl flex items-center gap-3 border-2 shrink-0 ${IS_CLOUD_ENABLED ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-rose-50 border-rose-500 text-rose-700'}`}>
            <div className={`w-2 h-2 rounded-full ${IS_CLOUD_ENABLED ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
-           <span className="text-[10px] font-black uppercase tracking-widest">{IS_CLOUD_ENABLED ? 'Cloud Connected' : 'Offline Mode (Local)'}</span>
+           <span className="text-[10px] font-black uppercase tracking-widest">{IS_CLOUD_ENABLED ? 'Cloud Online' : 'Local Only'}</span>
         </div>
 
         <div className="flex items-center gap-4 shrink-0">
