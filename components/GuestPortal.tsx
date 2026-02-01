@@ -16,9 +16,9 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
   const [mobile, setMobile] = useState('');
   const [guestName, setGuestName] = useState('');
   const [idFront, setIdFront] = useState('');
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [bookingRef, setBookingRef] = useState<Booking | null>(null);
   const [searchMobile, setSearchMobile] = useState('');
+  const [autoTable, setAutoTable] = useState<string | null>(null);
   
   // Order state
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -26,15 +26,27 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
   const [orderProcessing, setOrderProcessing] = useState(false);
   
   // Chat state
-  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', text: string}[]>([
-    { role: 'model', text: `Hello! I'm your AI Concierge at ${settings.name}. How can I make your stay memorable today?` }
-  ]);
+  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Detect table parameter from URL (e.g., from QR scan)
+    const params = new URLSearchParams(window.location.search);
+    const tableParam = params.get('table');
+    if (tableParam) {
+      setAutoTable(tableParam);
+      // If table identified, show welcome message and go to order view maybe?
+      console.debug(`Identified Guest Location: Table/Room ${tableParam}`);
+    }
+
     db.menuItems.toArray().then(setMenu);
+    
+    // Set initial greeting from settings
+    const welcome = settings.guestAppWelcome || `Hello! I'm your AI Concierge at ${settings.name}. How can I make your stay memorable today?`;
+    setChatMessages([{ role: 'model', text: welcome }]);
+
     // Try to auto-load booking from session storage if exists
     const savedBookingId = sessionStorage.getItem('activeBookingId');
     if (savedBookingId) {
@@ -42,9 +54,8 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
           if (b && b.status === 'ACTIVE') setBookingRef(b);
        });
     }
-  }, []);
+  }, [settings]);
 
-  // Fix: Added automatic scrolling to latest message in chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isTyping]);
@@ -100,34 +111,35 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
   };
 
   const handleOrder = async () => {
-    if (!bookingRef) {
+    // If we have a QR scanned table, we allow ordering even without a bookingRef (as walk-in)
+    const tableId = autoTable ? `TABLE-${autoTable}` : (bookingRef ? `ROOM-${allRooms.find(r => r.id === bookingRef.roomId)?.number}` : null);
+    
+    if (!tableId) {
        setView('FIND_ROOM');
        return;
     }
     if (cart.length === 0) return;
 
     setOrderProcessing(true);
-    const roomNum = allRooms.find(r => r.id === bookingRef.roomId)?.number || '??';
     
     const kot: KOT = {
       id: `KOT-G-${Date.now()}`,
-      tableId: `ROOM-${roomNum}`,
-      outletId: menu[0]?.outletId || 'rest-001',
-      waiterId: 'GUEST_APP',
-      items: cart.map(c => ({ menuItemId: c.item.id, quantity: c.qty, notes: `Room Service Order` })),
+      tableId: tableId,
+      outletId: menu[0]?.outletId || 'rest-main',
+      waiterId: 'GUEST_PORTAL_QR',
+      items: cart.map(c => ({ menuItemId: c.item.id, quantity: c.qty, notes: `QR Self-Order` })),
       status: 'PENDING',
       timestamp: new Date().toISOString(),
-      bookingId: bookingRef.id
+      bookingId: bookingRef?.id
     };
 
     await db.kots.put(kot);
     setCart([]);
     setOrderProcessing(false);
-    alert(`Order Placed! Room ${roomNum} is marked for service.`);
+    alert(`Order Transmitted! Kitchen is notified for ${tableId}.`);
     setView('HOME');
   };
 
-  // Fix: Implemented missing handleChat using @google/genai SDK
   const handleChat = async () => {
     if (!userInput.trim() || isTyping) return;
 
@@ -137,7 +149,6 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
     setIsTyping(true);
 
     try {
-      // Create a new GoogleGenAI instance right before making an API call to ensure latest key
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const response = await ai.models.generateContent({
@@ -150,12 +161,21 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
           { role: 'user', parts: [{ text: userText }] }
         ],
         config: {
-          systemInstruction: `You are the professional AI Concierge for ${settings.name}. 
+          systemInstruction: `You are the professional AI Concierge and Raipur/Chhattisgarh Expert for ${settings.name}.
+          
+          PROPERTY DETAILS:
           Address: ${settings.address}. 
           WiFi: ${settings.wifiPassword || 'Guest_WiFi'}. 
           Room Service: Call ${settings.roomServicePhone || 'Reception'}.
-          Help guests with amenities, local travel tips, and stay-related questions. 
-          Be polite, helpful, and concise.`
+
+          YOUR EXPERTISE & MISSION:
+          1. Persona: ${settings.guestAppPersona || 'Expert Travel Guide for Chhattisgarh'}.
+          2. Itinerary Planning: When asked for an itinerary, provide detailed, time-blocked plans (Day 1, Day 2, etc.).
+          3. Local Highlights: Focus on Raipur landmarks (Marine Drive, Nandan Van, Mahant Ghasidas Memorial Museum), Sirpur (Historical sites), Chitrakote Falls, and Barnawapara Wildlife Sanctuary.
+          
+          RESPONSE STYLE:
+          - Use Markdown for bolding and lists.
+          - Be welcoming, professional, and helpful.`
         }
       });
 
@@ -165,7 +185,7 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
       }
     } catch (err) {
       console.error("Concierge Error:", err);
-      setChatMessages(prev => [...prev, { role: 'model', text: "I apologize, but I'm having trouble connecting to my service. Please try again or visit our reception desk." }]);
+      setChatMessages(prev => [...prev, { role: 'model', text: "I apologize, but I'm having trouble connecting to my service." }]);
     } finally {
       setIsTyping(false);
     }
@@ -178,7 +198,9 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
            {view !== 'HOME' && <button onClick={() => setView('HOME')} className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">←</button>}
         </div>
         <h1 className="text-2xl font-black uppercase tracking-tighter leading-none">{settings.name}</h1>
-        <p className="text-[10px] font-black opacity-60 uppercase tracking-[0.3em] mt-1">Smart Interaction Node</p>
+        <p className="text-[10px] font-black opacity-60 uppercase tracking-[0.3em] mt-1">
+          {autoTable ? `Direct Access: Table ${autoTable}` : 'Smart Interaction Node'}
+        </p>
       </header>
 
       <main className="flex-1 max-w-2xl mx-auto w-full flex flex-col relative overflow-hidden">
@@ -190,9 +212,9 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
               <p className="text-xs text-slate-400 mb-10 font-bold uppercase tracking-widest">Self-Service Terminal</p>
               
               <div className="grid grid-cols-2 gap-4">
-                <MenuCard icon="🍽️" label="Order Food" onClick={() => setView('ORDER')} color="bg-orange-600" desc="In-Room Dining" />
+                <MenuCard icon="🍽️" label="Order Food" onClick={() => setView('ORDER')} color="bg-orange-600" desc={autoTable ? `Serving Table ${autoTable}` : "In-Room Dining"} />
                 <MenuCard icon="🔑" label="60s Check-in" onClick={() => setView('CHECKIN')} color="bg-blue-600" desc="Fast Identity" />
-                <MenuCard icon="🤖" label="AI Concierge" onClick={() => setView('CHAT')} color="bg-indigo-600" desc="Travel & Info" />
+                <MenuCard icon="🤖" label="AI Concierge" onClick={() => setView('CHAT')} color="bg-indigo-600" desc="Raipur & Travel" />
                 <MenuCard icon="🏨" label="Find My Room" onClick={() => setView('FIND_ROOM')} color="bg-slate-800" desc="Log into Folio" />
               </div>
             </div>
@@ -207,6 +229,16 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
                    <div className="bg-orange-600 px-4 py-1.5 rounded-full text-[9px] font-black uppercase">LINKED</div>
                 </div>
               </div>
+            )}
+            
+            {autoTable && !bookingRef && (
+               <div className="bg-white p-6 rounded-[2rem] border-2 border-orange-500 shadow-lg animate-pulse flex items-center gap-4">
+                  <span className="text-3xl">📍</span>
+                  <div>
+                     <p className="text-[10px] font-black uppercase text-orange-600">Location Identified</p>
+                     <p className="text-sm font-bold text-slate-800">You are seated at Table {autoTable}</p>
+                  </div>
+               </div>
             )}
           </div>
         )}
@@ -231,7 +263,9 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
                 <div className="flex justify-between items-center border-b pb-6 mb-6">
                    <div>
                       <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">Dining Menu</h2>
-                      <p className="text-[9px] font-black text-orange-600 uppercase mt-1">Auto-marked to your room bill</p>
+                      <p className="text-[9px] font-black text-orange-600 uppercase mt-1">
+                        {autoTable ? `Direct serving Table ${autoTable}` : 'Auto-marked to your room bill'}
+                      </p>
                    </div>
                    <button onClick={() => setView('HOME')} className="text-slate-300 font-black text-xs uppercase">Back</button>
                 </div>
@@ -259,7 +293,9 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
                        <span>Total Order</span>
                        <span className="text-orange-700 tracking-tighter">₹{cart.reduce((s,c) => s + (c.item.price * c.qty), 0).toFixed(2)}</span>
                      </div>
-                     <button onClick={handleOrder} disabled={orderProcessing} className="w-full bg-orange-600 text-white py-6 rounded-3xl font-black uppercase text-sm shadow-xl hover:bg-black transition-all">Place Order (Room Mark)</button>
+                     <button onClick={handleOrder} disabled={orderProcessing} className="w-full bg-orange-600 text-white py-6 rounded-3xl font-black uppercase text-sm shadow-xl hover:bg-black transition-all">
+                       {autoTable ? 'Send to Kitchen Now' : 'Place Order (Room Mark)'}
+                     </button>
                   </div>
                 )}
              </div>
@@ -279,24 +315,22 @@ const GuestPortal: React.FC<GuestPortalProps> = ({ settings, allRooms, onCheckin
                      </div>
                    </div>
                  ))}
-                 {/* Typing indicator */}
                  {isTyping && (
                    <div className="flex justify-start">
                      <div className="bg-white text-slate-400 p-4 rounded-[2rem] rounded-bl-none text-xs italic shadow-sm border border-slate-50">
-                        Concierge is typing...
+                        Ambassador is preparing your guide...
                      </div>
                    </div>
                  )}
                  <div ref={chatEndRef} />
               </div>
               <div className="p-4 bg-white rounded-[2.5rem] shadow-2xl border-2 border-white flex gap-3 items-center">
-                 {/* Fix: handleChat call fixed */}
                  <input 
                    disabled={isTyping}
                    className="flex-1 p-4 rounded-2xl font-bold text-sm bg-slate-50 outline-none text-slate-900" 
                    value={userInput} 
                    onChange={e => setUserInput(e.target.value)} 
-                   placeholder={isTyping ? "Concierge is thinking..." : "Ask concierge..."} 
+                   placeholder={isTyping ? "Consulting local maps..." : "Ask for Raipur itineraries..."} 
                    onKeyDown={e => e.key === 'Enter' && handleChat()} 
                  />
                  <button 

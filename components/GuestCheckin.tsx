@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Room, Guest, Booking, HostelSettings, Payment, RoomStatus, Occupant } from '../types.ts';
 import { INDIAN_STATES } from '../constants.tsx';
 import CameraCapture from './CameraCapture.tsx';
-import GRCFormView from './GRCFormView.tsx';
 
 interface RoomAssignment {
   roomId: string;
@@ -34,30 +33,11 @@ const GuestCheckin: React.FC<GuestCheckinProps> = ({
   initialSelectedRoomIds = [],
 }) => {
   const [guest, setGuest] = useState<Partial<Guest>>({
-    name: '',
-    gender: 'Male',
-    phone: '',
-    email: '',
-    address: '',
-    city: '',
-    state: 'Maharashtra',
-    nationality: 'Indian',
-    idType: 'Aadhar',
-    idNumber: '',
-    adults: 1,
-    children: 0,
-    kids: 0,
-    others: 0, 
-    documents: {}
+    name: '', gender: 'Male', phone: '', email: '', address: '', city: '', state: 'Chhattisgarh',
+    nationality: 'Indian', idType: 'Aadhar', idNumber: '', adults: 1, children: 0, kids: 0, others: 0, documents: {}
   });
 
   const [occupants, setOccupants] = useState<Occupant[]>([]);
-  const [secondaryGuest, setSecondaryGuest] = useState({
-    name: '',
-    gender: 'Male' as 'Male' | 'Female' | 'Other',
-    documents: { aadharFront: '', aadharBack: '' }
-  });
-
   const [checkInDate, setCheckInDate] = useState('');
   const [checkInTime, setCheckInTime] = useState('');
   const [checkOutDate, setCheckOutDate] = useState('');
@@ -66,13 +46,10 @@ const GuestCheckin: React.FC<GuestCheckinProps> = ({
   const [mealPlan, setMealPlan] = useState('EP (Room Only)');
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState('Cash');
-
   const [roomAssignments, setRoomAssignments] = useState<RoomAssignment[]>([]);
   
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [activeDocCapture, setActiveDocCapture] = useState<{ type: string, id?: string, field?: string } | null>(null);
-  const [showGRCPreview, setShowGRCPreview] = useState(false);
-  const [showRoomPicker, setShowRoomPicker] = useState(false);
 
   useEffect(() => {
     const now = new Date();
@@ -82,381 +59,150 @@ const GuestCheckin: React.FC<GuestCheckinProps> = ({
     tomorrow.setDate(tomorrow.getDate() + 1);
     setCheckOutDate(tomorrow.toISOString().split('T')[0]);
     const initialIds = initialSelectedRoomIds.length > 0 ? initialSelectedRoomIds : [room.id];
-    const assignments = initialIds.map(id => {
+    setRoomAssignments(initialIds.map(id => {
       const r = allRooms.find(x => x.id === id);
-      return {
-        roomId: id,
-        roomNumber: r?.number || '?',
-        tariff: r?.price || 0,
-        discount: 0,
-        type: r?.type || '?'
-      };
-    });
-    setRoomAssignments(assignments);
+      return { roomId: id, roomNumber: r?.number || '?', tariff: r?.price || 0, discount: 0, type: r?.type || '?' };
+    }));
   }, []);
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      if (document.exitFullscreen) document.exitFullscreen();
-    }
-  };
-
-  const stayDuration = useMemo(() => {
-    if (!checkInDate || !checkOutDate) return 1;
-    const start = new Date(checkInDate);
-    const end = new Date(checkOutDate);
-    return Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)));
-  }, [checkInDate, checkOutDate]);
-
-  const financialTotals = useMemo(() => {
-    const nights = stayDuration;
+  const totals = useMemo(() => {
+    const nights = Math.max(1, Math.ceil((new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / 86400000)) || 1;
     const subTotal = roomAssignments.reduce((acc, r) => acc + ((r.tariff * nights) - r.discount), 0);
-    const taxRate = settings.taxRate || 0;
-    const taxAmount = (subTotal * taxRate) / 100;
-    const grandTotal = subTotal + taxAmount;
-    return { subTotal, taxAmount, grandTotal };
-  }, [roomAssignments, settings.taxRate, stayDuration]);
-
-  const handleSearchGuest = () => {
-    if (!guest.phone) return;
-    const found = existingGuests.find(g => g.phone === guest.phone);
-    if (found) setGuest({ ...found });
-    else alert("No previous record found.");
-  };
-
-  const addOccupant = () => {
-    setOccupants([...occupants, { id: Math.random().toString(36).substr(2, 9), name: '', gender: 'Male' }]);
-  };
-
-  const removeOccupant = (id: string) => {
-    setOccupants(occupants.filter(o => o.id !== id));
-  };
-
-  const updateOccupant = (id: string, field: keyof Occupant, value: string) => {
-    setOccupants(occupants.map(o => o.id === id ? { ...o, [field]: value } : o));
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: { type: string, id?: string, field?: string }) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => applyDocumentUpdate(target, reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const applyDocumentUpdate = (target: { type: string, id?: string, field?: string }, data: string) => {
-    if (target.type === 'OCCUPANT' && target.id && target.field) {
-      setOccupants(prev => prev.map(o => o.id === target.id ? { ...o, [target.field as keyof Occupant]: data } : o));
-    } else if (target.type === 'SECONDARY') {
-      setSecondaryGuest(prev => ({ ...prev, documents: { ...prev.documents, [target.field as any]: data } }));
-    } else {
-      setGuest(prev => ({ ...prev, documents: { ...prev.documents, [target.field as any]: data } }));
-    }
-  };
-
-  const handleCameraCapture = (imageData: string) => {
-    if (activeDocCapture) applyDocumentUpdate(activeDocCapture as any, imageData);
-    setIsCameraOpen(false);
-    setActiveDocCapture(null);
-  };
+    const tax = (subTotal * (settings.taxRate || 0)) / 100;
+    return { subTotal, tax, grandTotal: subTotal + tax };
+  }, [roomAssignments, settings.taxRate, checkInDate, checkOutDate]);
 
   const handleSave = () => {
-    if (!guest.name || !guest.phone || roomAssignments.length === 0) {
-      alert("Please fill name, phone and select at least one room.");
-      return;
-    }
-    const initialPayments: Payment[] = advanceAmount > 0 ? [{
-      id: 'ADV-' + Date.now(),
-      amount: advanceAmount,
-      date: new Date().toISOString(),
-      method: paymentMode,
-      remarks: 'Advance during check-in'
-    }] : [];
-    const sessionGroupId = roomAssignments.length > 1 ? 'GRP-' + Math.random().toString(36).substr(2, 6).toUpperCase() : undefined;
+    if (!guest.name || !guest.phone || roomAssignments.length === 0) return alert("Fill mandatory fields.");
+    const initialPayments = advanceAmount > 0 ? [{ id: 'ADV-' + Date.now(), amount: advanceAmount, date: new Date().toISOString(), method: paymentMode, remarks: 'Advance during check-in' }] : [];
+    const gid = roomAssignments.length > 1 ? 'GRP-' + Math.random().toString(36).substr(2, 6).toUpperCase() : undefined;
     const bookings = roomAssignments.map(ra => ({
       bookingNo: 'BK-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-      roomId: ra.roomId,
-      groupId: sessionGroupId,
-      checkInDate, checkInTime, checkOutDate, checkOutTime,
-      status: 'ACTIVE',
-      basePrice: ra.tariff,
-      discount: ra.discount, 
-      mealPlan,
-      adults: guest.adults, children: guest.children, kids: guest.kids, others: guest.others,
-      charges: [], payments: initialPayments,
-      occupants: occupants,
-      secondaryGuest: secondaryGuest.name ? secondaryGuest : undefined
+      roomId: ra.roomId, groupId: gid, checkInDate, checkInTime, checkOutDate, checkOutTime, status: 'ACTIVE',
+      basePrice: ra.tariff, discount: ra.discount, mealPlan, adults: guest.adults, occupants: occupants,
+      charges: [], payments: initialPayments
     }));
     onSave({ guest, bookings });
   };
 
-  const vacantRooms = allRooms.filter(r => r.status === RoomStatus.VACANT && !roomAssignments.some(ra => ra.roomId === r.id));
-
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
-      <div className="bg-[#f8fafc] w-full max-w-7xl rounded-none md:rounded-[3rem] shadow-2xl flex flex-col h-full md:h-[94vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-[#020617]/90 backdrop-blur-md flex items-center justify-center p-0 md:p-4">
+      <div className="bg-[#0f172a] w-full max-w-7xl rounded-none md:rounded-[3rem] shadow-2xl flex flex-col h-full md:h-[94vh] overflow-hidden border border-white/10">
         
-        <div className="bg-[#003d80] p-4 md:p-8 text-white flex justify-between items-center no-print flex-shrink-0">
-          <div className="flex items-center gap-3 md:gap-4">
-            <button onClick={onClose} className="w-10 h-10 md:w-12 md:h-12 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center border border-white/20 transition-all shadow-lg">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
-            </button>
+        <div className="bg-[#020617] p-8 border-b border-white/5 flex justify-between items-center no-print">
+          <div className="flex items-center gap-6">
+            <button onClick={onClose} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 text-slate-400 hover:text-white transition-all">←</button>
             <div>
-              <h2 className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-tight">Registration</h2>
-              <p className="hidden sm:block text-[8px] md:text-[10px] font-bold text-blue-200 uppercase tracking-widest mt-1">Resident Intake Console</p>
+              <h2 className="text-3xl font-black uppercase tracking-tighter text-white">Registry Protocol</h2>
+              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mt-1">Authorized Resident Intake</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowGRCPreview(true)} className="bg-blue-600 text-white px-3 md:px-6 py-2 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-xs uppercase shadow-xl">Print GRC</button>
-            <button onClick={onClose} className="p-2 md:p-3 hover:bg-white/10 rounded-xl transition-all">
-              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-          </div>
+          <button onClick={onClose} className="p-3 hover:bg-white/5 rounded-2xl text-slate-500 transition-all">×</button>
         </div>
 
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden no-print">
-          <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar space-y-12 bg-white">
+          <div className="flex-1 overflow-y-auto p-10 custom-scrollbar space-y-12 bg-[#0a0f1e]">
             
-            <section className="space-y-6">
-              <SectionTitle index="01" title="Primary Guest Profile" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                <div className="flex gap-2 items-end sm:col-span-2">
-                  <Inp label="Mobile Number *" value={guest.phone} onChange={(v: string) => setGuest({...guest, phone: v})} />
-                  <button onClick={handleSearchGuest} className="bg-blue-600 text-white px-4 py-3.5 rounded-2xl font-black text-[9px] uppercase mb-0.5">Lookup</button>
+            <section className="space-y-8">
+              <SectionHeader label="01" title="Primary Identity" />
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="md:col-span-2">
+                   <Inp label="Mobile Number *" value={guest.phone} onChange={(v:any) => setGuest({...guest, phone: v})} />
                 </div>
-                <Inp label="Full Name *" value={guest.name} onChange={(v: string) => setGuest({...guest, name: v})} className="sm:col-span-2" />
-                <Inp label="Nationality" value={guest.nationality} onChange={(v: string) => setGuest({...guest, nationality: v})} />
-                <div className="space-y-1">
-                  <label className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 ml-1">Gender</label>
-                  <select className="w-full border-2 p-3.5 rounded-2xl text-[11px] font-black bg-slate-50 outline-none" value={guest.gender} onChange={e => setGuest({...guest, gender: e.target.value as any})}>
+                <div className="md:col-span-2">
+                   <Inp label="Full Legal Name *" value={guest.name} onChange={(v:any) => setGuest({...guest, name: v})} />
+                </div>
+                <Inp label="Nationality" value={guest.nationality} onChange={(v:any) => setGuest({...guest, nationality: v})} />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 ml-2 tracking-widest">Gender</label>
+                  <select className="w-full bg-[#1e293b] border border-white/10 p-4 rounded-2xl font-black text-xs text-white outline-none focus:border-orange-500" value={guest.gender} onChange={e => setGuest({...guest, gender: e.target.value as any})}>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
-                    <option value="Other">Other</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 ml-1">Document Type</label>
-                  <select className="w-full border-2 p-3.5 rounded-2xl text-[11px] font-black bg-slate-50 outline-none" value={guest.idType} onChange={e => setGuest({...guest, idType: e.target.value as any})}>
-                    <option value="Aadhar">Aadhar Card</option>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 ml-2 tracking-widest">ID Type</label>
+                  <select className="w-full bg-[#1e293b] border border-white/10 p-4 rounded-2xl font-black text-xs text-white outline-none focus:border-orange-500" value={guest.idType} onChange={e => setGuest({...guest, idType: e.target.value as any})}>
+                    <option value="Aadhar">Aadhar</option>
                     <option value="Passport">Passport</option>
-                    <option value="Other">Other ID</option>
                   </select>
                 </div>
-                <Inp label="ID Ref Number" value={guest.idNumber} onChange={(v: string) => setGuest({...guest, idNumber: v})} />
+                <Inp label="ID Ref #" value={guest.idNumber} onChange={(v:any) => setGuest({...guest, idNumber: v})} />
               </div>
             </section>
 
-            <section className="space-y-6">
-              <div className="flex justify-between items-center">
-                 <SectionTitle index="02" title="Group Registry" />
-                 <button onClick={addOccupant} className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-black text-[8px] md:text-[9px] uppercase border-2 border-blue-100">+ Add Person</button>
-              </div>
-              <div className="grid grid-cols-1 gap-4">
-                {occupants.map((occ, idx) => (
-                  <div key={occ.id} className="p-4 md:p-6 bg-slate-50 rounded-2xl md:rounded-[2.5rem] border border-slate-100 space-y-4 relative">
-                     <button onClick={() => removeOccupant(occ.id)} className="absolute top-4 right-4 text-red-400 hover:text-red-600 font-black text-[10px]">REMOVE</button>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                        <div className="sm:col-span-2">
-                           <Inp label={`Occupant ${idx + 1} Name`} value={occ.name} onChange={(v: string) => updateOccupant(occ.id, 'name', v)} />
-                        </div>
-                        <div className="space-y-1">
-                           <label className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 ml-1">Gender</label>
-                           <select className="w-full border-2 p-3.5 rounded-2xl text-[11px] font-black bg-white" value={occ.gender} onChange={e => updateOccupant(occ.id, 'gender', e.target.value as any)}>
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
-                           </select>
-                        </div>
-                        <div className="flex items-end gap-2">
-                           <DocBoxMini label="ID Front" src={occ.idFront} onUpload={e => handleFileUpload(e, {type:'OCCUPANT', id: occ.id, field:'idFront'})} onSnap={() => { setActiveDocCapture({type:'OCCUPANT', id: occ.id, field:'idFront'}); setIsCameraOpen(true); }} />
-                           <DocBoxMini label="ID Back" src={occ.idBack} onUpload={e => handleFileUpload(e, {type:'OCCUPANT', id: occ.id, field:'idBack'})} onSnap={() => { setActiveDocCapture({type:'OCCUPANT', id: occ.id, field:'idBack'}); setIsCameraOpen(true); }} />
-                        </div>
-                     </div>
+            <section className="space-y-8">
+               <SectionHeader label="02" title="Assets & Verification" />
+               <div className="grid grid-cols-3 gap-6">
+                  <div className="aspect-video bg-slate-900 border border-white/10 rounded-[2rem] flex items-center justify-center group relative overflow-hidden">
+                     <span className="text-[10px] font-black text-slate-600 uppercase">Aadhar Front</span>
+                     <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" />
                   </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="space-y-6">
-              <SectionTitle index="03" title="KYC Assets" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                <div className="grid grid-cols-2 gap-3">
-                   <DocBox label="ID Front" src={guest.documents?.aadharFront} onChange={(e: any) => handleFileUpload(e, {type:'PRIMARY', field:'aadharFront'})} onCapture={() => { setActiveDocCapture({type:'PRIMARY', field:'aadharFront'}); setIsCameraOpen(true); }} />
-                   <DocBox label="ID Back" src={guest.documents?.aadharBack} onChange={(e: any) => handleFileUpload(e, {type:'PRIMARY', field:'aadharBack'})} onCapture={() => { setActiveDocCapture({type:'PRIMARY', field:'aadharBack'}); setIsCameraOpen(true); }} />
-                </div>
-                <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-[2rem] bg-slate-50">
-                   {guest.documents?.photo ? <img src={guest.documents.photo} className="w-20 h-20 rounded-full object-cover shadow-lg border-4 border-white" /> : <div className="text-[9px] font-black text-slate-300 uppercase">LIVE PHOTO</div>}
-                   <button onClick={() => { setActiveDocCapture({type:'PRIMARY', field:'photo'}); setIsCameraOpen(true); }} className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-[8px] uppercase">Snap Face</button>
-                </div>
-                <div className="space-y-3">
-                   <Inp label="Arrival From" value={guest.arrivalFrom} onChange={(v: string) => setGuest({...guest, arrivalFrom: v})} />
-                   <Inp label="Next Destination" value={guest.nextDestination} onChange={(v: string) => setGuest({...guest, nextDestination: v})} />
-                </div>
-              </div>
-            </section>
-
-            <section className="space-y-6 pb-20">
-              <div className="flex justify-between items-end border-b pb-4">
-                 <SectionTitle index="04" title="Inventory" />
-                 <button onClick={() => setShowRoomPicker(true)} className="bg-blue-900 text-white px-5 py-2 rounded-xl font-black text-[9px] uppercase shadow-xl">+ Add Room</button>
-              </div>
-              <div className="border rounded-2xl md:rounded-[2.5rem] overflow-hidden shadow-sm overflow-x-auto">
-                <table className="w-full text-left min-w-[500px]">
-                  <thead className="bg-slate-900 text-white font-black uppercase text-[9px]">
-                    <tr>
-                      <th className="p-4">Unit</th>
-                      <th className="p-4 w-32 text-right">Tariff (₹)</th>
-                      <th className="p-4 w-32 text-right">Disc. (₹)</th>
-                      <th className="p-4 w-12 text-center"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y font-bold uppercase text-[11px] bg-white">
-                    {roomAssignments.map((ra) => (
-                      <tr key={ra.roomId}>
-                        <td className="p-4 font-black text-blue-900">{ra.roomNumber} <span className="text-[8px] text-slate-400 block font-normal">{ra.type}</span></td>
-                        <td className="p-4 text-right">
-                          <input type="number" className="w-full bg-slate-50 rounded-lg p-2 font-black text-right outline-none text-blue-900" value={ra.tariff} onChange={(e) => setRoomAssignments(prev => prev.map(r => r.roomId === ra.roomId ? { ...r, tariff: parseFloat(e.target.value) || 0 } : r))} />
-                        </td>
-                        <td className="p-4 text-right">
-                          <input type="number" className="w-full bg-red-50/30 rounded-lg p-2 font-black text-right outline-none text-red-600" value={ra.discount} onChange={(e) => setRoomAssignments(prev => prev.map(r => r.roomId === ra.roomId ? { ...r, discount: parseFloat(e.target.value) || 0 } : r))} />
-                        </td>
-                        <td className="p-4 text-center">
-                           <button onClick={() => setRoomAssignments(roomAssignments.filter(r => r.roomId !== ra.roomId))} className="text-red-300 hover:text-red-600 text-lg">×</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  <div className="aspect-video bg-slate-900 border border-white/10 rounded-[2rem] flex items-center justify-center group relative overflow-hidden">
+                     <span className="text-[10px] font-black text-slate-600 uppercase">Aadhar Back</span>
+                     <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" />
+                  </div>
+                  <div className="flex flex-col items-center justify-center p-6 bg-slate-900 border border-white/10 rounded-[2rem]">
+                     <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center text-slate-500 mb-4 border border-white/5">📸</div>
+                     <button className="bg-orange-600 text-white px-6 py-2 rounded-xl font-black text-[9px] uppercase shadow-lg">LIVE PHOTO</button>
+                  </div>
+               </div>
             </section>
           </div>
 
-          <div className="w-full lg:w-[360px] bg-slate-50 border-t lg:border-t-0 lg:border-l p-6 md:p-8 space-y-6 flex flex-col flex-shrink-0 overflow-y-auto custom-scrollbar">
-            <h3 className="font-black text-[10px] uppercase text-slate-400 tracking-widest border-b pb-4">Folio Master Summary</h3>
-            <div className="space-y-4 flex-1">
-              <div className="grid grid-cols-2 gap-3">
-                 <Inp label="Exp. Checkout" type="date" value={checkOutDate} onChange={setCheckOutDate} />
-                 <Inp label="Time" type="time" value={checkOutTime} onChange={setCheckOutTime} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Package Plan</label>
-                <select className="w-full border-2 p-3.5 rounded-2xl font-black text-[11px] bg-white outline-none" value={mealPlan} onChange={e => setMealPlan(e.target.value)}>
-                  <option value="EP (Room Only)">EP (Room Only)</option>
-                  <option value="CP (Room + B/Fast)">CP (Room + B/Fast)</option>
-                  <option value="MAP (Room + 2 Meals)">MAP (Room + 2 Meals)</option>
-                  <option value="AP (Room + All Meals)">AP (Room + All Meals)</option>
-                </select>
-              </div>
-              <div className="p-6 bg-white border rounded-[2rem] shadow-sm space-y-3">
-                 <div className="flex justify-between items-end border-t pt-2">
-                    <p className="text-[10px] font-black uppercase text-blue-900 leading-none">Grand Total</p>
-                    <p className="text-2xl font-black text-blue-900 leading-none tracking-tighter">₹{financialTotals.grandTotal.toFixed(2)}</p>
-                 </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3">
-                 <Inp label="Advance Pay (₹)" type="number" value={advanceAmount.toString()} onChange={(v: string) => setAdvanceAmount(parseFloat(v) || 0)} />
-                 <div className="space-y-1">
-                    <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Mode</label>
-                    <select className="w-full border-2 p-3.5 rounded-2xl font-black text-[11px] bg-white outline-none" value={paymentMode} onChange={e => setPaymentMode(e.target.value)}>
-                       <option value="Cash">Cash</option>
-                       <option value="UPI">UPI</option>
-                    </select>
-                 </div>
-              </div>
+          {/* Right Summary Sidebar */}
+          <div className="w-full lg:w-[400px] bg-[#020617] border-l border-white/5 p-10 space-y-8 flex flex-col flex-shrink-0">
+            <h3 className="font-black text-[11px] uppercase text-slate-500 tracking-[0.4em] text-center border-b border-white/5 pb-6">FOLIO MASTER</h3>
+            <div className="flex-1 space-y-6">
+               <div className="grid grid-cols-2 gap-4">
+                  <Inp label="Arriving" type="date" value={checkInDate} onChange={setCheckInDate} />
+                  <Inp label="Time" type="time" value={checkInTime} onChange={setCheckInTime} />
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                  <Inp label="Departure" type="date" value={checkOutDate} onChange={setCheckOutDate} />
+                  <Inp label="Time" type="time" value={checkOutTime} onChange={setCheckOutTime} />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-[10px] font-black uppercase text-slate-500 ml-2">Package Plan</label>
+                 <select className="w-full bg-[#111] border border-white/10 p-4 rounded-2xl font-black text-[11px] text-white outline-none focus:border-orange-500" value={mealPlan} onChange={e => setMealPlan(e.target.value)}>
+                   <option value="EP (Room Only)">EP (Room Only)</option>
+                   <option value="CP (Room + B/Fast)">CP (Room + B/Fast)</option>
+                 </select>
+               </div>
+
+               <div className="bg-[#0f172a] p-10 rounded-[3rem] border border-white/5 shadow-2xl text-center space-y-4">
+                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">NET PAYABLE</p>
+                  <h4 className="text-5xl font-black text-white tracking-tighter">₹{totals.grandTotal.toFixed(0)}</h4>
+                  <div className="h-px bg-white/5 mx-10"></div>
+                  <div className="flex justify-between text-[11px] font-black text-slate-400 px-4">
+                     <span>TAX @ {settings.taxRate}%</span>
+                     <span className="text-white">₹{totals.tax.toFixed(0)}</span>
+                  </div>
+               </div>
+               
+               <Inp label="Advance Payment (₹)" type="number" value={advanceAmount.toString()} onChange={(v:any) => setAdvanceAmount(parseFloat(v))} />
             </div>
-            <div className="space-y-3 pt-4 pb-4">
-              <button onClick={handleSave} className="w-full bg-[#003d80] text-white py-5 rounded-2xl font-black uppercase text-[11px] shadow-2xl hover:scale-[1.02] transition-all">Authorize Check-in</button>
-              <button onClick={onClose} className="w-full py-2 text-slate-400 font-black uppercase text-[9px] hover:text-red-500">Discard</button>
-            </div>
+
+            <button onClick={handleSave} className="w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(230,92,0,0.2)] hover:bg-orange-700 transition-all transform active:scale-95">AUTHORIZE INTAKE ✅</button>
           </div>
         </div>
-
-        {showRoomPicker && (
-          <div className="fixed inset-0 z-[160] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
-             <div className="bg-white w-full max-w-xl rounded-[2rem] md:rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                <div className="bg-blue-900 p-6 md:p-8 text-white flex justify-between items-center">
-                   <h3 className="text-lg md:text-xl font-black uppercase tracking-tighter">Inventory Selector</h3>
-                   <button onClick={() => setShowRoomPicker(false)} className="uppercase text-[9px] font-black">Close</button>
-                </div>
-                <div className="p-6 md:p-10">
-                   <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 md:gap-3 max-h-96 overflow-y-auto custom-scrollbar">
-                      {vacantRooms.map(vr => (
-                        <button key={vr.id} onClick={() => setRoomAssignments([...roomAssignments, { roomId: vr.id, roomNumber: vr.number, tariff: vr.price, discount: 0, type: vr.type }])} className="p-3 md:p-4 bg-slate-50 border-2 border-white hover:border-blue-500 rounded-xl md:rounded-2xl font-black uppercase transition-all">
-                           <div className="text-base md:text-lg">{vr.number}</div>
-                        </button>
-                      ))}
-                   </div>
-                </div>
-             </div>
-          </div>
-        )}
-
-        {showGRCPreview && (
-          <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col overflow-hidden">
-             <div className="bg-black p-4 flex justify-between items-center">
-                <p className="text-white font-black uppercase text-[10px]">GRC Preview</p>
-                <button onClick={() => setShowGRCPreview(false)} className="text-white font-black uppercase text-[10px]">Close [X]</button>
-             </div>
-             <div className="flex-1 overflow-y-auto bg-gray-500/20 p-4 md:p-8 custom-scrollbar">
-                <GRCFormView guest={guest} booking={{ checkInDate, checkInTime, checkOutDate, checkOutTime }} room={room} settings={settings} />
-             </div>
-          </div>
-        )}
       </div>
-      {isCameraOpen && <CameraCapture onCapture={handleCameraCapture} onClose={() => { setIsCameraOpen(false); setActiveDocCapture(null); }} />}
     </div>
   );
 };
 
-const SectionTitle = ({ index, title }: { index: string, title: string }) => (
-  <div className="flex items-center gap-3 md:gap-4">
-    <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-900 rounded-xl md:rounded-2xl flex items-center justify-center text-white font-black text-[10px] md:text-xs shrink-0">{index}</div>
-    <h3 className="text-lg md:text-xl font-black text-blue-900 uppercase tracking-tighter whitespace-nowrap">{title}</h3>
-    <div className="h-px bg-slate-100 flex-1 ml-2"></div>
+const SectionHeader = ({ label, title }: any) => (
+  <div className="flex items-center gap-4">
+    <span className="w-10 h-10 bg-orange-600 text-white rounded-2xl flex items-center justify-center font-black text-xs shadow-lg">{label}</span>
+    <h3 className="text-xl font-black uppercase tracking-tight text-white">{title}</h3>
+    <div className="flex-1 h-px bg-white/5"></div>
   </div>
 );
 
-const Inp = ({ label, value, onChange, type = "text", className = "" }: any) => (
-  <div className={`space-y-1 w-full text-left ${className}`}>
-    <label className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{label}</label>
-    <input type={type} className="w-full border-2 p-3.5 rounded-2xl font-black text-[11px] bg-slate-50 outline-none focus:border-blue-500 transition-all text-black" value={value || ''} onChange={e => onChange(e.target.value)} />
-  </div>
-);
-
-const DocBoxMini = ({ label, src, onUpload, onSnap }: any) => (
-   <div className="relative w-14 md:w-16 h-10 md:h-12 bg-white border border-dashed rounded-lg flex flex-col items-center justify-center overflow-hidden group">
-      {src ? <img src={src} className="w-full h-full object-cover" /> : <span className="text-[6px] font-black text-slate-300 uppercase">{label}</span>}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-black/80 flex items-center justify-center gap-1 transition-opacity">
-         <div className="relative overflow-hidden p-1">
-            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={onUpload} />
-         </div>
-         <button type="button" onClick={onSnap} className="p-1">
-            <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-         </button>
-      </div>
-   </div>
-);
-
-const DocBox = ({ label, src, onChange, onCapture }: any) => (
-  <div className="relative aspect-video bg-white border-2 border-dashed border-slate-200 rounded-2xl overflow-hidden flex flex-col items-center justify-center group hover:border-blue-400 transition-all shadow-sm">
-    {src ? (
-      <img src={src} className="w-full h-full object-cover" />
-    ) : (
-      <div className="text-center p-2">
-        <svg className="w-5 h-5 md:w-6 md:h-6 text-slate-200 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-        <span className="text-[7px] md:text-[8px] font-black text-slate-300 uppercase tracking-widest text-center block">{label}</span>
-      </div>
-    )}
-    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-black/60 flex items-center justify-center gap-2 transition-opacity">
-       <div className="relative overflow-hidden bg-white p-1.5 md:p-2 rounded-lg cursor-pointer">
-          <span className="text-[7px] md:text-[8px] font-black uppercase">Upload</span>
-          <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={onChange} />
-       </div>
-       <button type="button" onClick={onCapture} className="bg-blue-600 text-white p-1.5 md:p-2 rounded-lg text-[7px] md:text-[8px] font-black uppercase">Snap</button>
-    </div>
+const Inp = ({ label, value, onChange, type = "text", placeholder = "" }: any) => (
+  <div className="space-y-2 w-full text-left">
+    <label className="text-[10px] font-black uppercase text-slate-500 ml-2 tracking-widest">{label}</label>
+    <input type={type} className="w-full bg-[#111] border border-white/10 p-4 rounded-2xl font-black text-[12px] text-white outline-none focus:border-orange-500 transition-all shadow-inner" value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
   </div>
 );
 

@@ -1,17 +1,19 @@
--- HOTEL SPHERE PRO: MASTER DATABASE INITIALIZATION (FIXED)
--- TARGET: SUPABASE POSTGRESQL SQL EDITOR
--- VERSION: 5.2.0
 
--- 1. CORE OPERATIONAL TABLES
+-- HOTEL SPHERE PRO: COMPREHENSIVE MASTER DATABASE SETUP
+-- VERSION: 5.3.0
+-- TARGET: SUPABASE POSTGRESQL
+
+-- 1. PROPERTY BLUEPRINT
 CREATE TABLE IF NOT EXISTS rooms (
     id TEXT PRIMARY KEY,
     number TEXT NOT NULL,
-    floor INT NOT NULL DEFAULT 1,
+    floor TEXT NOT NULL DEFAULT '1',
     block TEXT DEFAULT 'Main',
     type TEXT NOT NULL,
     price NUMERIC NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'VACANT',
-    "currentBookingId" TEXT
+    "currentBookingId" TEXT,
+    "bedType" TEXT DEFAULT 'Double Bed'
 );
 
 CREATE TABLE IF NOT EXISTS guests (
@@ -50,6 +52,7 @@ CREATE TABLE IF NOT EXISTS guests (
     "visaDateOfExpiry" TEXT
 );
 
+-- 2. OPERATIONAL FLOW
 CREATE TABLE IF NOT EXISTS bookings (
     id TEXT PRIMARY KEY,
     "bookingNo" TEXT NOT NULL,
@@ -65,10 +68,69 @@ CREATE TABLE IF NOT EXISTS bookings (
     payments JSONB DEFAULT '[]'::jsonb,
     "basePrice" NUMERIC NOT NULL DEFAULT 0,
     discount NUMERIC DEFAULT 0,
-    "mealPlan" TEXT DEFAULT 'EP (Room Only)'
+    "mealPlan" TEXT DEFAULT 'EP (Room Only)',
+    "secondaryGuest" JSONB,
+    purpose TEXT
 );
 
--- 2. FINANCIALS & GROUP MODULE
+-- 3. HUMAN RESOURCES & PAYROLL
+CREATE TABLE IF NOT EXISTS supervisors (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    "loginId" TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL DEFAULT 'admin',
+    role TEXT DEFAULT 'RECEPTIONIST',
+    "assignedRoomIds" JSONB DEFAULT '[]'::jsonb,
+    status TEXT DEFAULT 'ACTIVE',
+    photo TEXT,
+    phone TEXT,
+    "basicPay" NUMERIC DEFAULT 0,
+    hra NUMERIC DEFAULT 0,
+    "vehicleAllowance" NUMERIC DEFAULT 0,
+    "otherAllowances" NUMERIC DEFAULT 0,
+    "bankName" TEXT,
+    "accountNumber" TEXT,
+    "uanNumber" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS payroll (
+    id TEXT PRIMARY KEY,
+    "staffId" TEXT REFERENCES supervisors(id),
+    month TEXT NOT NULL,
+    "daysInMonth" INT DEFAULT 30,
+    "workedDays" NUMERIC DEFAULT 30,
+    "lopDays" NUMERIC DEFAULT 0,
+    "basicPay" NUMERIC DEFAULT 0,
+    hra NUMERIC DEFAULT 0,
+    "vehicleAllowance" NUMERIC DEFAULT 0,
+    "otherAllowances" NUMERIC DEFAULT 0,
+    bonus NUMERIC DEFAULT 0,
+    "grossEarnings" NUMERIC DEFAULT 0,
+    "epfEmployee" NUMERIC DEFAULT 0,
+    "esiEmployee" NUMERIC DEFAULT 0,
+    tds NUMERIC DEFAULT 0,
+    "loanRecovery" NUMERIC DEFAULT 0,
+    "otherDeductions" NUMERIC DEFAULT 0,
+    "totalDeductions" NUMERIC DEFAULT 0,
+    "epfEmployer" NUMERIC DEFAULT 0,
+    "esiEmployer" NUMERIC DEFAULT 0,
+    "netSalary" NUMERIC DEFAULT 0,
+    status TEXT DEFAULT 'PENDING',
+    "paymentDate" TIMESTAMP WITH TIME ZONE,
+    "paymentMethod" TEXT
+);
+
+CREATE TABLE IF NOT EXISTS leave_requests (
+    id TEXT PRIMARY KEY,
+    "staffId" TEXT REFERENCES supervisors(id),
+    "startDate" DATE NOT NULL,
+    "endDate" DATE NOT NULL,
+    type TEXT DEFAULT 'CL',
+    reason TEXT,
+    status TEXT DEFAULT 'PENDING'
+);
+
+-- 4. FINANCIAL LEDGERS
 CREATE TABLE IF NOT EXISTS transactions (
     id TEXT PRIMARY KEY,
     date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -90,61 +152,26 @@ CREATE TABLE IF NOT EXISTS groups (
     status TEXT DEFAULT 'ACTIVE',
     "billingPreference" TEXT DEFAULT 'Single',
     "groupType" TEXT,
-    "orgName" TEXT
+    "orgName" TEXT,
+    documents JSONB DEFAULT '{}'::jsonb
 );
 
--- 3. STAFF & ADMINISTRATION
-CREATE TABLE IF NOT EXISTS supervisors (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    "loginId" TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL DEFAULT 'admin'
-);
-
--- Ensure columns exist for older supervisor table versions
-ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'SUPERVISOR';
-ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS "assignedRoomIds" JSONB DEFAULT '[]'::jsonb;
-ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ACTIVE';
-ALTER TABLE supervisors ADD COLUMN IF NOT EXISTS "lastActive" TIMESTAMP WITH TIME ZONE;
-
-CREATE TABLE IF NOT EXISTS settings (
-    id TEXT PRIMARY KEY DEFAULT 'primary',
-    name TEXT NOT NULL DEFAULT 'Hotel Sphere Pro',
-    address TEXT,
-    agents JSONB DEFAULT '[]'::jsonb,
-    "roomTypes" JSONB DEFAULT '["DELUXE ROOM", "BUDGET ROOM", "STANDARD ROOM", "AC FAMILY ROOM", "SUITE"]'::jsonb,
-    blocks JSONB DEFAULT '["Main Block", "Block A", "Block B"]'::jsonb,
-    "gstNumber" TEXT,
-    "taxRate" NUMERIC DEFAULT 12,
-    "cgstRate" NUMERIC DEFAULT 6,
-    "sgstRate" NUMERIC DEFAULT 6,
-    "igstRate" NUMERIC DEFAULT 12,
-    "hsnCode" TEXT DEFAULT '9963',
-    "upiId" TEXT,
-    "logo" TEXT,
-    "signature" TEXT,
-    "wifiPassword" TEXT DEFAULT 'welcome123',
-    "receptionPhone" TEXT DEFAULT '9',
-    "roomServicePhone" TEXT DEFAULT '8',
-    "restaurantMenuLink" TEXT
-);
-
--- 4. BANQUETS & EVENTS
+-- 5. BANQUETS & CATERING
 CREATE TABLE IF NOT EXISTS banquet_halls (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    capacity INT NOT NULL DEFAULT 100,
-    "basePrice" NUMERIC NOT NULL DEFAULT 0,
-    type TEXT NOT NULL DEFAULT 'HALL'
+    capacity INT DEFAULT 100,
+    "basePrice" NUMERIC DEFAULT 0,
+    type TEXT DEFAULT 'HALL'
 );
 
 CREATE TABLE IF NOT EXISTS event_bookings (
     id TEXT PRIMARY KEY,
-    "hallId" TEXT NOT NULL REFERENCES banquet_halls(id),
+    "hallId" TEXT REFERENCES banquet_halls(id),
     "guestName" TEXT NOT NULL,
     "guestPhone" TEXT NOT NULL,
     "eventName" TEXT NOT NULL,
-    "eventType" TEXT DEFAULT 'Corporate',
+    "eventType" TEXT,
     date DATE NOT NULL,
     "startTime" TIME,
     "endTime" TIME,
@@ -153,24 +180,23 @@ CREATE TABLE IF NOT EXISTS event_bookings (
     discount NUMERIC DEFAULT 0,
     "paymentMode" TEXT DEFAULT 'Cash',
     status TEXT DEFAULT 'TENTATIVE',
-    catering JSONB DEFAULT '{}'::jsonb,
-    "guestCount" INT NOT NULL DEFAULT 50
+    catering JSONB,
+    "guestCount" INT DEFAULT 50
 );
 
 CREATE TABLE IF NOT EXISTS catering_menu (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     category TEXT NOT NULL,
-    "pricePerPlate" NUMERIC NOT NULL DEFAULT 0,
-    "prepInstructions" TEXT,
+    "pricePerPlate" NUMERIC DEFAULT 0,
     ingredients JSONB DEFAULT '[]'::jsonb
 );
 
--- 5. RESTAURANT & POS
+-- 6. DINING POS
 CREATE TABLE IF NOT EXISTS restaurants (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    type TEXT NOT NULL DEFAULT 'FineDine'
+    type TEXT DEFAULT 'FineDine'
 );
 
 CREATE TABLE IF NOT EXISTS menu_items (
@@ -179,55 +205,51 @@ CREATE TABLE IF NOT EXISTS menu_items (
     category TEXT NOT NULL,
     subcategory TEXT,
     price NUMERIC NOT NULL DEFAULT 0,
-    "outletId" TEXT NOT NULL REFERENCES restaurants(id),
+    "outletId" TEXT REFERENCES restaurants(id),
     "isAvailable" BOOLEAN DEFAULT TRUE,
-    ingredients TEXT,
-    "dietaryType" TEXT DEFAULT 'VEG',
-    "isVegan" BOOLEAN DEFAULT FALSE,
-    "containsMilk" BOOLEAN DEFAULT TRUE
+    "dietaryType" TEXT DEFAULT 'VEG'
 );
 
 CREATE TABLE IF NOT EXISTS dining_tables (
     id TEXT PRIMARY KEY,
     number TEXT NOT NULL,
-    "outletId" TEXT NOT NULL REFERENCES restaurants(id),
+    "outletId" TEXT REFERENCES restaurants(id),
     status TEXT DEFAULT 'VACANT'
 );
 
 CREATE TABLE IF NOT EXISTS kots (
     id TEXT PRIMARY KEY,
     "tableId" TEXT NOT NULL,
-    "outletId" TEXT NOT NULL REFERENCES restaurants(id),
+    "outletId" TEXT NOT NULL,
     "waiterId" TEXT,
     items JSONB NOT NULL,
     status TEXT DEFAULT 'PENDING',
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    "bookingId" TEXT,
-    "paymentMethod" TEXT
+    "bookingId" TEXT
 );
 
 CREATE TABLE IF NOT EXISTS dining_bills (
     id TEXT PRIMARY KEY,
     "billNo" TEXT NOT NULL UNIQUE,
     date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    "outletId" TEXT NOT NULL REFERENCES restaurants(id),
-    "tableNumber" TEXT NOT NULL,
-    items JSONB NOT NULL,
-    "subTotal" NUMERIC NOT NULL DEFAULT 0,
-    "taxAmount" NUMERIC NOT NULL DEFAULT 0,
-    "grandTotal" NUMERIC NOT NULL DEFAULT 0,
-    "paymentMode" TEXT NOT NULL DEFAULT 'Cash',
+    "outletId" TEXT,
+    "tableNumber" TEXT,
+    items JSONB,
+    "subTotal" NUMERIC,
+    "taxAmount" NUMERIC,
+    "grandTotal" NUMERIC,
+    "paymentMode" TEXT,
     "guestName" TEXT,
     "guestPhone" TEXT,
     "roomBookingId" TEXT
 );
 
--- 6. INVENTORY & VENDORS
+-- 7. INVENTORY & LOGISTICS
 CREATE TABLE IF NOT EXISTS inventory (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    category TEXT NOT NULL DEFAULT 'Housekeeping',
-    unit TEXT NOT NULL DEFAULT 'Unit',
+    category TEXT DEFAULT 'Housekeeping',
+    unit TEXT DEFAULT 'Unit',
     "currentStock" NUMERIC DEFAULT 0,
     "minStockLevel" NUMERIC DEFAULT 5,
     "lastPurchasePrice" NUMERIC DEFAULT 0
@@ -238,23 +260,23 @@ CREATE TABLE IF NOT EXISTS vendors (
     name TEXT NOT NULL,
     contact TEXT NOT NULL,
     gstin TEXT,
-    category TEXT DEFAULT 'General'
+    category TEXT
 );
 
 CREATE TABLE IF NOT EXISTS stock_receipts (
     id TEXT PRIMARY KEY,
-    date DATE NOT NULL DEFAULT CURRENT_DATE,
-    "itemId" TEXT NOT NULL REFERENCES inventory(id),
-    "vendorId" TEXT NOT NULL REFERENCES vendors(id),
-    quantity NUMERIC NOT NULL DEFAULT 0,
-    "unitPrice" NUMERIC NOT NULL DEFAULT 0,
-    "totalAmount" NUMERIC NOT NULL DEFAULT 0,
+    date DATE DEFAULT CURRENT_DATE,
+    "itemId" TEXT REFERENCES inventory(id),
+    "vendorId" TEXT REFERENCES vendors(id),
+    quantity NUMERIC DEFAULT 0,
+    "unitPrice" NUMERIC DEFAULT 0,
+    "totalAmount" NUMERIC DEFAULT 0,
     "paymentMade" NUMERIC DEFAULT 0,
-    "paymentMode" TEXT DEFAULT 'Cash',
+    "paymentMode" TEXT,
     "billNumber" TEXT
 );
 
--- 7. FACILITIES & TRAVEL
+-- 8. FACILITIES & FLEET
 CREATE TABLE IF NOT EXISTS facility_usage (
     id TEXT PRIMARY KEY,
     "facilityId" TEXT NOT NULL,
@@ -263,8 +285,8 @@ CREATE TABLE IF NOT EXISTS facility_usage (
     "endTime" TIMESTAMP WITH TIME ZONE,
     amount NUMERIC DEFAULT 0,
     "isBilledToRoom" BOOLEAN DEFAULT TRUE,
-    "outsiderInfo" JSONB DEFAULT '{}'::jsonb,
-    items JSONB DEFAULT '[]'::jsonb
+    "outsiderInfo" JSONB,
+    items JSONB
 );
 
 CREATE TABLE IF NOT EXISTS travel_bookings (
@@ -274,36 +296,47 @@ CREATE TABLE IF NOT EXISTS travel_bookings (
     "vehicleType" TEXT DEFAULT 'Sedan',
     "vehicleNumber" TEXT,
     "driverName" TEXT,
-    "pickupLocation" TEXT DEFAULT 'Property Lobby',
+    "pickupLocation" TEXT,
     "dropLocation" TEXT,
-    date DATE NOT NULL DEFAULT CURRENT_DATE,
-    time TIME NOT NULL DEFAULT CURRENT_TIME,
+    date DATE DEFAULT CURRENT_DATE,
+    time TIME DEFAULT CURRENT_TIME,
     "kmUsed" NUMERIC DEFAULT 0,
     "daysOfTravelling" INT DEFAULT 1,
-    amount NUMERIC NOT NULL DEFAULT 0,
+    amount NUMERIC DEFAULT 0,
     status TEXT DEFAULT 'BOOKED',
     "roomBookingId" TEXT
 );
 
--- 8. INITIAL DATA SEEDING
-INSERT INTO settings (id, name, address, "taxRate") 
-VALUES ('primary', 'Hotel Sphere Pro', 'Digital Communique Head Office', 12)
-ON CONFLICT (id) DO NOTHING;
+-- 9. SYSTEM CONFIG
+CREATE TABLE IF NOT EXISTS settings (
+    id TEXT PRIMARY KEY DEFAULT 'primary',
+    name TEXT NOT NULL DEFAULT 'Hotel Sphere Pro',
+    address TEXT,
+    agents JSONB DEFAULT '[]'::jsonb,
+    "roomTypes" JSONB DEFAULT '[]'::jsonb,
+    "mealPlans" JSONB DEFAULT '[]'::jsonb,
+    floors JSONB DEFAULT '[]'::jsonb,
+    blocks JSONB DEFAULT '[]'::jsonb,
+    "taxRate" NUMERIC DEFAULT 12,
+    "gstNumber" TEXT,
+    "upiId" TEXT,
+    logo TEXT,
+    signature TEXT,
+    wallpaper TEXT,
+    "hsnCode" TEXT DEFAULT '9963',
+    "adminPassword" TEXT DEFAULT 'admin',
+    "receptionistPassword" TEXT DEFAULT 'admin',
+    "accountantPassword" TEXT DEFAULT 'admin',
+    "supervisorPassword" TEXT DEFAULT 'admin',
+    "cgstRate" NUMERIC,
+    "sgstRate" NUMERIC,
+    "igstRate" NUMERIC,
+    "epfRateEmployee" NUMERIC DEFAULT 12,
+    "epfRateEmployer" NUMERIC DEFAULT 12,
+    "esiRateEmployee" NUMERIC DEFAULT 0.75,
+    "esiRateEmployer" NUMERIC DEFAULT 3.25
+);
 
--- Using COALESCE to safely handle potential nulls during migration inserts
-INSERT INTO supervisors (id, name, "loginId", password, role)
-VALUES ('s-master', 'Master Administrator', 'superadmin', 'admin', 'SUPERADMIN')
-ON CONFLICT (id) DO UPDATE SET 
-    role = EXCLUDED.role,
-    name = EXCLUDED.name;
-
--- 9. PERFORMANCE INDEXES
-CREATE INDEX IF NOT EXISTS idx_bookings_guest ON bookings("guestId");
-CREATE INDEX IF NOT EXISTS idx_bookings_room ON bookings("roomId");
-CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
-CREATE INDEX IF NOT EXISTS idx_kots_table ON kots("tableId");
-CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
-CREATE INDEX IF NOT EXISTS idx_inventory_name ON inventory(name);
-
--- 10. REFRESH SCHEMA FOR POSTGREST
+-- 10. REFRESH & SEED
+INSERT INTO settings (id, name) VALUES ('primary', 'Hotel Sphere Pro') ON CONFLICT (id) DO NOTHING;
 NOTIFY pgrst, 'reload schema';

@@ -53,12 +53,11 @@ export interface Room {
   status: RoomStatus;
   currentBookingId?: string;
   block: string;
-  bedType: 'Single Bed' | 'Double Bed';
+  bedType: string;
 }
 
 export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'RECEPTIONIST' | 'ACCOUNTANT' | 'SUPERVISOR' | 'WAITER' | 'CHEF' | 'STOREKEEPER';
 
-/* Fixed: Added basicPay and allowance fields for Payroll logic */
 export interface Supervisor {
   id: string;
   name: string;
@@ -78,7 +77,6 @@ export interface Supervisor {
   uanNumber?: string;
 }
 
-/* Fixed: Added travel, passport and identity fields required for GRC/Police registration */
 export interface Guest {
   id: string;
   name: string; 
@@ -135,7 +133,6 @@ export interface Booking {
   purpose?: string;
 }
 
-/* Fixed: Added types used in Accounting and Reports modules */
 export type TransactionType = 'RECEIPT' | 'PAYMENT' | 'JOURNAL';
 export type AccountGroupName = 'Capital' | 'Fixed Asset' | 'Current Asset' | 'Direct Expense' | 'Indirect Expense' | 'Direct Income' | 'Indirect Income' | 'Current Liability' | 'Operating';
 
@@ -150,7 +147,6 @@ export interface Transaction {
   description: string;
 }
 
-/* Fixed: Added password, tax rates, and payroll config fields to HostelSettings */
 export interface HostelSettings {
   id: string;
   name: string;
@@ -160,6 +156,7 @@ export interface HostelSettings {
   mealPlans: string[];
   floors: string[];
   blocks: BlockConfig[];
+  bedTypes: string[];
   taxRate: number;
   wifiPassword?: string;
   receptionPhone?: string;
@@ -181,9 +178,11 @@ export interface HostelSettings {
   epfRateEmployer?: number;
   esiRateEmployee?: number;
   esiRateEmployer?: number;
+  guestAppWelcome?: string;
+  guestAppPersona?: string;
+  externalApiKey?: string;
 }
 
-/* Fixed: Added GroupProfile and Banquet interfaces missing from definitions */
 export interface GroupProfile {
   id: string;
   groupName: string;
@@ -261,7 +260,6 @@ export interface FacilityUsage { id: string; facilityId: Facility | string; gues
 export interface TravelBooking { id: string; guestId: string; guestName: string; vehicleType: string; vehicleNumber: string; driverName: string; pickupLocation: string; dropLocation: string; date: string; time: string; kmUsed: number; daysOfTravelling: number; amount: number; status: string; roomBookingId?: string; }
 export interface StockReceipt { id: string; itemId: string; vendorId: string; quantity: number; unitPrice: number; totalAmount: number; paymentMade: number; paymentMode: string; date: string; billNumber: string; }
 
-/* Fixed: Expanded PayrollRecord to include all calculation fields used in the module */
 export interface PayrollRecord { 
   id: string; 
   staffId: string; 
