@@ -2,7 +2,7 @@
 import { RoomStatus, RoomType, Room } from './types';
 
 export const STATUS_COLORS: Record<RoomStatus, string> = {
-  [RoomStatus.VACANT]: 'bg-white border-emerald-200 text-emerald-900 shadow-sm',
+  [RoomStatus.VACANT]: 'bg-white border-slate-200 text-slate-900 shadow-sm',
   [RoomStatus.OCCUPIED]: 'bg-indigo-50/50 border-indigo-500 text-indigo-900 shadow-sm',
   [RoomStatus.RESERVED]: 'bg-orange-50/50 border-orange-400 text-orange-900 shadow-sm',
   [RoomStatus.DIRTY]: 'bg-rose-50/50 border-rose-400 text-rose-900 shadow-sm',
@@ -22,34 +22,43 @@ export const INDIAN_STATES = [
   "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
+// Helper to generate the specific room list provided in the image
+const generateBlockRooms = (prefix: string, blockName: string): Room[] => {
+  const rooms: Room[] = [];
+
+  const deluxeNumbers = [
+    '101','102','103','104','105','106', 
+    '211','212','214','215','216',
+    '311','312','314','315','316','317','318','319','320', 
+    '321','322','323','324','325','326','327','328','329','330','331','332'
+  ];
+  const premiumNumbers = ['202','204','205','206','207','208','302','304','305','306','307','308'];
+  const superPremiumNumbers = ['203','210','303','310'];
+  const suiteNumbers = ['201','209','301','309'];
+
+  const add = (nums: string[], type: string, price: number) => {
+    nums.forEach(n => {
+      rooms.push({
+        id: `${prefix}${n}`,
+        number: `${prefix}${n}`,
+        floor: parseInt(n[0]),
+        type: type,
+        price: price,
+        status: RoomStatus.VACANT,
+        block: blockName
+      });
+    });
+  };
+
+  add(deluxeNumbers, 'DELUXE ROOM', 2900);
+  add(premiumNumbers, 'PREMIUM ROOM', 3500);
+  add(superPremiumNumbers, 'SUPER PREMIUM ROOM', 4500);
+  add(suiteNumbers, 'SUITE ROOM', 6500);
+
+  return rooms;
+};
+
 export const INITIAL_ROOMS: Room[] = [
-  // First Floor
-  { id: '101', number: '101', floor: 1, type: RoomType.DELUXE, price: 2900, status: RoomStatus.VACANT },
-  { id: '102', number: '102', floor: 1, type: RoomType.DELUXE, price: 2900, status: RoomStatus.VACANT },
-  { id: '103', number: '103', floor: 1, type: RoomType.BUDGET, price: 2000, status: RoomStatus.DIRTY },
-  { id: '104', number: '104', floor: 1, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '105', number: '105', floor: 1, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '106', number: '106', floor: 1, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '107', number: '107', floor: 1, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '108', number: '108', floor: 1, type: RoomType.AC_FAMILY, price: 4100, status: RoomStatus.VACANT },
-  { id: '109', number: '109', floor: 1, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '110', number: '110', floor: 1, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-
-  // Second Floor
-  { id: '201', number: '201', floor: 2, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '202', number: '202', floor: 2, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '203', number: '203', floor: 2, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '204', number: '204', floor: 2, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '205', number: '205', floor: 2, type: RoomType.STANDARD, price: 2500, status: RoomStatus.VACANT },
-  { id: '206', number: '206', floor: 2, type: RoomType.STANDARD, price: 2500, status: RoomStatus.VACANT },
-  { id: '207', number: '207', floor: 2, type: RoomType.STANDARD, price: 2500, status: RoomStatus.VACANT },
-  { id: '208', number: '208', floor: 2, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '209', number: '209', floor: 2, type: RoomType.STANDARD, price: 2500, status: RoomStatus.VACANT },
-  { id: '210', number: '210', floor: 2, type: RoomType.DELUXE, price: 2900, status: RoomStatus.VACANT },
-  { id: '211', number: '211', floor: 2, type: RoomType.STANDARD, price: 2500, status: RoomStatus.VACANT },
-
-  // Third Floor
-  { id: '301', number: '301', floor: 3, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '302', number: '302', floor: 3, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
-  { id: '303', number: '303', floor: 3, type: RoomType.BUDGET, price: 2000, status: RoomStatus.VACANT },
+  ...generateBlockRooms('A', 'Ayodhya'),
+  ...generateBlockRooms('M', 'Mithila')
 ];

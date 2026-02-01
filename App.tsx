@@ -17,6 +17,7 @@ import ReservationPipeline from './components/ReservationPipeline.tsx';
 import GlobalBillArchive from './components/GlobalBillArchive.tsx';
 import GuestPortal from './components/GuestPortal.tsx';
 import PayrollModule from './components/PayrollModule.tsx';
+import SupervisorPanel from './components/SupervisorPanel.tsx';
 
 // --- MODULES ---
 import BanquetModule from './components/BanquetModule.tsx';
@@ -40,7 +41,7 @@ const getGuestTheme = (name: string) => {
   return GUEST_THEMES[Math.abs(hash) % GUEST_THEMES.length];
 };
 
-type AppTab = 'DASHBOARD' | 'BANQUET' | 'DINING' | 'FACILITY' | 'TRAVEL' | 'GROUP' | 'INVENTORY' | 'ACCOUNTING' | 'PAYROLL' | 'REPORTS' | 'SETTINGS' | 'GUEST_PORTAL';
+type AppTab = 'DASHBOARD' | 'BANQUET' | 'DINING' | 'FACILITY' | 'TRAVEL' | 'GROUP' | 'INVENTORY' | 'ACCOUNTING' | 'PAYROLL' | 'REPORTS' | 'SETTINGS' | 'GUEST_PORTAL' | 'SUPERVISOR_PANEL';
 
 const App: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -54,10 +55,10 @@ const App: React.FC = () => {
   const [isCloudSyncing, setIsCloudSyncing] = useState(false);
   
   const [settings, setSettings] = useState<HostelSettings>({
-    name: 'Hotel Sphere Pro',
-    address: 'Digital Communique Private Limited',
+    name: 'Shubhkamna Hotel And Resort',
+    address: 'Ayodhya',
     agents: [{ name: 'Direct', commission: 0 }],
-    roomTypes: ['DELUXE ROOM', 'BUDGET ROOM', 'STANDARD ROOM', 'AC FAMILY ROOM'],
+    roomTypes: ['DELUXE ROOM', 'PREMIUM ROOM', 'SUPER PREMIUM ROOM', 'SUITE ROOM'],
     mealPlans: ['EP (Room Only)', 'CP (Breakfast)', 'MAP (Half Board)', 'AP (Full Board)'],
     floors: [1, 2, 3],
     taxRate: 12,
@@ -70,6 +71,7 @@ const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isGuestPortal, setIsGuestPortal] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>('RECEPTIONIST');
+  const [loggedInStaff, setLoggedInStaff] = useState<Supervisor | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('DASHBOARD');
   
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -140,9 +142,11 @@ const App: React.FC = () => {
 
   const handleLogin = (role: UserRole, supervisor?: Supervisor) => {
     setCurrentUserRole(role);
+    setLoggedInStaff(supervisor || null);
     setIsLoggedIn(true);
     if (role === 'CHEF' || role === 'WAITER') setActiveTab('DINING');
     else if (role === 'ACCOUNTANT') setActiveTab('ACCOUNTING');
+    else if (role === 'SUPERVISOR') setActiveTab('SUPERVISOR_PANEL');
     else setActiveTab('DASHBOARD');
   };
 
@@ -157,6 +161,7 @@ const App: React.FC = () => {
   const navItems = useMemo(() => {
     const allItems: { tab: AppTab, label: string }[] = [
       { tab: 'DASHBOARD', label: 'Front Desk' },
+      { tab: 'SUPERVISOR_PANEL', label: 'Housekeeping' },
       { tab: 'DINING', label: 'Dining POS' },
       { tab: 'BANQUET', label: 'Banquets' },
       { tab: 'FACILITY', label: 'Facilities' },
@@ -170,15 +175,16 @@ const App: React.FC = () => {
     ];
     if (currentUserRole === 'CHEF' || currentUserRole === 'WAITER') return allItems.filter(i => i.tab === 'DINING');
     if (currentUserRole === 'ACCOUNTANT') return allItems.filter(i => ['ACCOUNTING', 'PAYROLL', 'REPORTS'].includes(i.tab));
+    if (currentUserRole === 'SUPERVISOR') return allItems.filter(i => i.tab === 'SUPERVISOR_PANEL' || i.tab === 'DINING');
     return allItems;
   }, [currentUserRole]);
 
-  const roomsByFloor = useMemo(() => {
+  const roomsByBlock = useMemo(() => {
     const filtered = statusFilter === 'ALL' ? rooms : rooms.filter(r => r.status === statusFilter);
     return filtered.reduce((acc, room) => {
-      const floorKey = room.floor.toString();
-      if (!acc[floorKey]) acc[floorKey] = [];
-      acc[floorKey].push(room);
+      const blockKey = room.block || 'Main';
+      if (!acc[blockKey]) acc[blockKey] = [];
+      acc[blockKey].push(room);
       return acc;
     }, {} as Record<string, Room[]>);
   }, [rooms, statusFilter]);
@@ -294,6 +300,7 @@ const App: React.FC = () => {
     }
 
     switch (activeTab) {
+      case 'SUPERVISOR_PANEL': return <SupervisorPanel staff={loggedInStaff} rooms={rooms} bookings={bookings} onUpdateRoom={async (ru) => { await db.rooms.put(ru); setRooms(rooms.map(r => r.id === ru.id ? ru : r)); }} />;
       case 'BANQUET': return <BanquetModule settings={settings} guests={guests} rooms={rooms} roomBookings={bookings} onUpdateBooking={async (bu) => { await db.bookings.put(bu); setBookings(bookings.map(b => b.id === bu.id ? bu : b)); }} />;
       case 'DINING': return <DiningModule rooms={rooms} bookings={bookings} guests={guests} settings={settings} userRole={currentUserRole} onUpdateBooking={async (bu) => { await db.bookings.put(bu); setBookings(bookings.map(b => b.id === bu.id ? bu : b)); }} />;
       case 'FACILITY': return <FacilityModule guests={guests} bookings={bookings} rooms={rooms} settings={settings} onUpdateBooking={async (bu) => { await db.bookings.put(bu); setBookings(bookings.map(b => b.id === bu.id ? bu : b)); }} />;
@@ -309,12 +316,12 @@ const App: React.FC = () => {
           <div className="p-4 md:p-8 lg:p-10 pb-40 relative animate-in fade-in duration-700">
             <div className="flex flex-col md:flex-row justify-between items-center mb-10 lg:mb-14 gap-6 glass-card p-8 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] shadow-2xl shadow-orange-100/50 border border-white">
                <div className="flex flex-col gap-1 text-center md:text-left">
-                 <h1 className="text-2xl md:text-4xl font-extrabold text-slate-900 uppercase tracking-tighter leading-none">Property Dashboard</h1>
-                 <p className="text-[9px] md:text-[11px] font-bold text-orange-500 uppercase tracking-[0.4em] ml-1">Terminal Master Hub</p>
+                 <h1 className="text-2xl md:text-4xl font-extrabold text-slate-900 uppercase tracking-tighter leading-none">{settings.name}</h1>
+                 <p className="text-[9px] md:text-[11px] font-bold text-orange-500 uppercase tracking-[0.4em] ml-1">Grand Resort Management Terminal</p>
                </div>
                <div className="flex flex-col items-center md:items-end gap-4 w-full md:w-auto">
                   <button onClick={toggleFullscreen} className="hidden md:flex bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-bold text-[10px] uppercase shadow-xl hover:bg-orange-600 transition-all items-center gap-3 border border-white/10 group">
-                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                    <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l-5 5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
                     FULLSCREEN
                   </button>
                   <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
@@ -328,50 +335,58 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            {(Object.entries(roomsByFloor) as [string, Room[]][]).sort((a, b) => parseInt(a[0]) - parseInt(b[0])).map(([floor, floorRooms]) => (
-              <div key={floor} className="mb-14">
-                <h3 className="text-[10px] md:text-[12px] font-extrabold uppercase text-slate-400 mb-8 tracking-[0.3em] flex items-center gap-4">
-                  <span className="w-12 h-1 bg-orange-600 rounded-full"></span>
-                  Level {floor} Grid
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 md:gap-6">
-                  {floorRooms.map(room => {
-                    const today = new Date().toISOString().split('T')[0];
-                    const activeB = bookings.find(b => b.roomId === room.id && b.status === 'ACTIVE');
-                    const reservedToday = bookings.find(b => b.roomId === room.id && b.status === 'RESERVED' && b.checkInDate === today);
-                    const guestObj = (activeB || reservedToday) ? guests.find(g => g.id === (activeB || reservedToday)!.guestId) : null;
-                    const effectiveStatus = activeB ? RoomStatus.OCCUPIED : reservedToday ? RoomStatus.RESERVED : room.status;
-                    const theme = guestObj ? getGuestTheme(guestObj.name) : null;
-                    const isSelected = selectedRoomIds.has(room.id);
+            {Object.entries(roomsByBlock).sort().map(([block, blockRooms]) => {
+              const isAyodhya = block === 'Ayodhya';
+              const blockTheme = isAyodhya 
+                ? 'border-blue-600 shadow-blue-100 ring-blue-50 text-blue-900 bg-blue-50' 
+                : 'border-orange-600 shadow-orange-100 ring-orange-50 text-orange-900 bg-orange-50';
+              const blockIcon = isAyodhya ? '🔱' : '🚩';
 
-                    return (
-                      <button 
-                        key={room.id} 
-                        onClick={() => {
-                          if (isSelectionMode) {
-                            if (effectiveStatus === RoomStatus.VACANT || effectiveStatus === RoomStatus.DIRTY) toggleRoomSelection(room.id);
-                            else alert("Only vacant or laundry units can be selected for multi check-in.");
-                          } else {
-                            if (activeB || reservedToday) setActiveBookingId((activeB || reservedToday)!.id);
-                            else { setSelectedRoom(room); setShowRoomActions(true); }
-                          }
-                        }} 
-                        className={`min-h-[150px] md:min-h-[170px] border-2 rounded-[2.5rem] md:rounded-[3rem] p-5 md:p-7 flex flex-col items-center justify-between transition-all shadow-md relative group ${isSelected ? 'border-orange-600 ring-[10px] ring-orange-50 scale-105 z-10 bg-orange-50' : theme ? `${theme.bg} ${theme.border} ${theme.text}` : STATUS_COLORS[effectiveStatus]} hover:shadow-2xl hover:-translate-y-1`}
-                      >
-                        {isSelected && <div className="absolute -top-3 -right-3 w-8 h-8 bg-orange-600 text-white rounded-2xl flex items-center justify-center text-xs font-black shadow-xl animate-in zoom-in border-4 border-white">✓</div>}
-                        <span className="text-3xl md:text-4xl font-extrabold tracking-tighter uppercase leading-none">{room.number}</span>
-                        <div className="text-center w-full">
-                           <div className={`text-[8px] md:text-[9px] font-black uppercase mb-1.5 opacity-60 truncate ${theme ? theme.status.split(' ')[0] : ''}`}>
-                             {guestObj ? guestObj.name : room.type}
-                           </div>
-                           <div className={`text-[7px] md:text-[8px] font-black uppercase py-1.5 px-4 md:px-6 rounded-full border-2 border-current inline-block ${theme ? theme.status : ''}`}>{effectiveStatus}</div>
-                        </div>
-                      </button>
-                    );
-                  })}
+              return (
+                <div key={block} className="mb-14">
+                  <h3 className={`text-[12px] font-black uppercase mb-8 tracking-[0.3em] flex items-center gap-4 ${isAyodhya ? 'text-blue-600' : 'text-orange-600'}`}>
+                    <span className={`w-12 h-1 rounded-full ${isAyodhya ? 'bg-blue-600' : 'bg-orange-600'}`}></span>
+                    {blockIcon} {block} Block Grid
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 md:gap-6">
+                    {blockRooms.sort((a,b) => a.number.localeCompare(b.number)).map(room => {
+                      const today = new Date().toISOString().split('T')[0];
+                      const activeB = bookings.find(b => b.roomId === room.id && b.status === 'ACTIVE');
+                      const reservedToday = bookings.find(b => b.roomId === room.id && b.status === 'RESERVED' && b.checkInDate === today);
+                      const guestObj = (activeB || reservedToday) ? guests.find(g => g.id === (activeB || reservedToday)!.guestId) : null;
+                      const effectiveStatus = activeB ? RoomStatus.OCCUPIED : reservedToday ? RoomStatus.RESERVED : room.status;
+                      const theme = guestObj ? getGuestTheme(guestObj.name) : null;
+                      const isSelected = selectedRoomIds.has(room.id);
+
+                      return (
+                        <button 
+                          key={room.id} 
+                          onClick={() => {
+                            if (isSelectionMode) {
+                              if (effectiveStatus === RoomStatus.VACANT || effectiveStatus === RoomStatus.DIRTY) toggleRoomSelection(room.id);
+                              else alert("Only vacant or laundry units can be selected for multi check-in.");
+                            } else {
+                              if (activeB || reservedToday) setActiveBookingId((activeB || reservedToday)!.id);
+                              else { setSelectedRoom(room); setShowRoomActions(true); }
+                            }
+                          }} 
+                          className={`min-h-[150px] md:min-h-[170px] border-2 rounded-[2.5rem] md:rounded-[3rem] p-5 md:p-7 flex flex-col items-center justify-between transition-all shadow-md relative group ${isSelected ? 'ring-[10px] ring-orange-50 scale-105 z-10 ' + blockTheme : theme ? `${theme.bg} ${theme.border} ${theme.text}` : `${blockTheme.replace('bg-opacity-100', '')} ${STATUS_COLORS[effectiveStatus].includes('white') ? blockTheme : STATUS_COLORS[effectiveStatus]}`} hover:shadow-2xl hover:-translate-y-1`}
+                        >
+                          {isSelected && <div className="absolute -top-3 -right-3 w-8 h-8 bg-orange-600 text-white rounded-2xl flex items-center justify-center text-xs font-black shadow-xl animate-in zoom-in border-4 border-white">✓</div>}
+                          <span className={`text-3xl md:text-4xl font-extrabold tracking-tighter uppercase leading-none ${isAyodhya ? 'text-blue-900' : 'text-orange-900'}`}>{room.number}</span>
+                          <div className="text-center w-full">
+                             <div className={`text-[8px] md:text-[9px] font-black uppercase mb-1.5 opacity-60 truncate ${theme ? theme.status.split(' ')[0] : (isAyodhya ? 'text-blue-800' : 'text-orange-800')}`}>
+                               {guestObj ? guestObj.name : room.type}
+                             </div>
+                             <div className={`text-[7px] md:text-[8px] font-black uppercase py-1.5 px-4 md:px-6 rounded-full border-2 border-current inline-block ${theme ? theme.status : ''}`}>{effectiveStatus}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         );
     }
@@ -392,8 +407,15 @@ const App: React.FC = () => {
 
   if (!isLoggedIn) return <Login onLogin={handleLogin} settings={settings} supervisors={supervisors} />;
 
+  const dynamicStyle = settings.wallpaper ? {
+    backgroundImage: `linear-gradient(rgba(248, 250, 252, 0.8), rgba(248, 250, 252, 0.8)), url(${settings.wallpaper})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed'
+  } : {};
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 transition-all duration-500 overflow-hidden">
+    <div className="min-h-screen flex flex-col transition-all duration-500 overflow-hidden" style={dynamicStyle}>
       <nav className="bg-[#1a0f00] text-white px-4 md:px-10 py-0 flex items-center shadow-2xl sticky top-0 z-50 no-print border-b border-white/5 shrink-0 overflow-hidden h-[72px]">
         <div className="flex items-center gap-8 h-full">
           <div className="flex gap-1 overflow-x-auto scrollbar-hide flex-1 items-center h-full custom-scrollbar">
@@ -411,9 +433,9 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="flex-1 overflow-y-auto custom-scrollbar no-print bg-[#f8fafc]">{renderContent()}</main>
+      <main className="flex-1 overflow-y-auto custom-scrollbar no-print">{renderContent()}</main>
 
-      <footer className="bg-white border-t border-slate-100 px-4 md:px-10 py-4 md:py-6 flex flex-col md:flex-row justify-between items-center z-40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] no-print shrink-0 gap-6">
+      <footer className="bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 md:px-10 py-4 md:py-6 flex flex-col md:flex-row justify-between items-center z-40 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] no-print shrink-0 gap-6">
         <div className="flex gap-6 md:gap-10 items-center overflow-x-auto scrollbar-hide w-full md:w-auto">
           <Stat label="Global" count={rooms.length} color="text-slate-400" onClick={() => setStatusFilter('ALL')} active={statusFilter === 'ALL'} />
           <Stat label="Ready" count={rooms.filter(r=>r.status===RoomStatus.VACANT).length} color="text-emerald-500" onClick={() => setStatusFilter(RoomStatus.VACANT)} active={statusFilter === RoomStatus.VACANT} />

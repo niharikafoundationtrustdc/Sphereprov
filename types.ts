@@ -49,11 +49,12 @@ export interface AgentConfig {
   commission: number;
 }
 
-/* Added missing CateringIngredient interface */
+/* Updated CateringIngredient interface with unitCost */
 export interface CateringIngredient {
   name: string;
   qtyPerPlate: number;
   unit: string;
+  unitCost: number; // Cost per 1 unit (e.g., cost per KG)
 }
 
 /* Added missing EventCatering interface */
@@ -309,6 +310,7 @@ export interface HostelSettings {
   receptionPhone?: string;
   roomServicePhone?: string;
   logo?: string;
+  wallpaper?: string;
   signature?: string;
   gstNumber?: string;
   upiId?: string;
@@ -342,6 +344,7 @@ export interface GroupProfile {
 
 export interface Quotation { id: string; date: string; guestName: string; amount: number; remarks: string; }
 export interface RoomShiftLog { id: string; date: string; bookingId: string; guestName?: string; fromRoom?: string; toRoom?: string; reason?: string; }
+export interface RoomShiftLog { id: string; date: string; bookingId: string; guestName?: string; fromRoom?: string; toRoom?: string; reason?: string; }
 export interface CleaningLog { id: string; date: string; roomId: string; staffName?: string; }
 export interface CateringItem { id: string; name: string; category: string; pricePerPlate: number; /* Added missing ingredients field */ ingredients?: CateringIngredient[]; }
 export interface RestaurantOutlet { id: string; name: string; type: string; }
@@ -367,5 +370,6 @@ export interface FacilityUsage {
     email: string;
   };
 }
+export interface TravelBooking { id: string; guestId: string; guestName: string; vehicleType: string; vehicleNumber: string; driverName: string; pickupLocation: string; dropLocation: string; date: string; time: string; kmUsed: number; daysOfTravelling: number; amount: number; status: string; roomBookingId?: string; }
 export interface TravelBooking { id: string; guestId: string; guestName: string; vehicleType: string; vehicleNumber: string; driverName: string; pickupLocation: string; dropLocation: string; date: string; time: string; kmUsed: number; daysOfTravelling: number; amount: number; status: string; roomBookingId?: string; }
 export interface StockReceipt { id: string; itemId: string; vendorId: string; quantity: number; unitPrice: number; totalAmount: number; paymentMade: number; paymentMode: string; date: string; billNumber: string; }
