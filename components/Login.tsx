@@ -19,12 +19,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, settings, supervisors }) => {
     const normalizedId = username.trim().toLowerCase();
     const normalizedPass = password.trim();
     
-    // Default system credentials
+    // Default system credentials updated per user request
     const credentials: Record<string, { id: string, pass: string }> = {
       'SUPERADMIN': { id: 'superadmin', pass: 'admin' },
       'ADMIN': { id: 'admin', pass: 'admin' },
-      'RECEPTIONIST': { id: 'reception', pass: 'admin' },
-      'ACCOUNTANT': { id: 'accounts', pass: 'admin' },
+      'RECEPTIONIST': { id: 'r@gmail.com', pass: 'admin' },
+      'MANAGER': { id: 'm@gmail.com', pass: 'admin' },
+      'CHEF': { id: 'c@gmail.com', pass: 'admin' },
+      'WAITER': { id: 'w@gmail.com', pass: 'admin' },
+      'SUPERVISOR': { id: 's@gmail.com', pass: 'admin' },
+      'ACCOUNTANT': { id: 'accounts@gmail.com', pass: 'admin' },
     };
 
     if (credentials[selectedRole]) {
@@ -89,12 +93,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, settings, supervisors }) => {
         <form onSubmit={handleLogin} className="space-y-8 bg-white p-2 rounded-[2rem] shadow-xl border border-white">
           <div className="space-y-6 px-4 py-8">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">LOGIN IDENTITY</label>
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">LOGIN IDENTITY (EMAIL)</label>
               <input 
                 type="text" 
                 required 
-                placeholder="USERNAME"
-                className="w-full bg-slate-50 border-2 border-transparent focus:border-[#e65c00] p-5 rounded-2xl font-black text-xs text-slate-900 outline-none transition-all shadow-inner uppercase" 
+                placeholder="e.g. s@gmail.com"
+                className="w-full bg-slate-50 border-2 border-transparent focus:border-[#e65c00] p-5 rounded-2xl font-black text-xs text-slate-900 outline-none transition-all shadow-inner" 
                 value={username} 
                 onChange={e => setUsername(e.target.value)} 
               />

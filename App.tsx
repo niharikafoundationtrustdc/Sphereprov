@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Room, RoomStatus, Guest, Booking, HostelSettings, Transaction, GroupProfile, UserRole, Supervisor, Quotation } from './types.ts';
+import { Room, RoomStatus, Guest, Booking, HostelSettings, Transaction, GroupProfile, UserRole, Supervisor, Quotation, RoomShiftLog } from './types.ts';
 import { INITIAL_ROOMS } from './constants.tsx';
 import { db, exportDatabase } from './services/db.ts';
 import { pullFromCloud, subscribeToTable, IS_CLOUD_ENABLED } from './services/supabase.ts';
@@ -45,6 +45,7 @@ const App: React.FC = () => {
     agents: [{ name: 'Direct', commission: 0 }],
     roomTypes: ['DELUXE ROOM', 'SUPER DELUXE ROOM', 'PREMIUM ROOM', 'SUPER PREMIUM ROOM', 'SUITE ROOM'],
     mealPlans: ['EP (Room Only)', 'CP (Breakfast)', 'MAP (Half Board)', 'AP (Full Board)'],
+    mealPlanRates: [],
     floors: ['1st Floor', '2nd Floor', '3rd Floor', '4th Floor'],
     blocks: [
       { id: 'b1', name: 'Ayodhya', prefix: 'A', color: 'blue' },
@@ -75,6 +76,11 @@ const App: React.FC = () => {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set());
 
+  const handleUpdateSettings = async (newSettings: HostelSettings) => {
+    await db.settings.put(newSettings as any);
+    setSettings(newSettings);
+  };
+
   const refreshLocalState = useCallback(async () => {
     setRooms(await db.rooms.toArray());
     setGuests(await db.guests.toArray());
@@ -104,7 +110,6 @@ const App: React.FC = () => {
 
     const init = async () => {
       try {
-        // ENFORCED: Wipe local cache on every boot to satisfy "Do not store locally"
         await db.wipeCache();
 
         const tables = ['rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'settings'];
@@ -120,7 +125,6 @@ const App: React.FC = () => {
         }
         
         const existingRooms = await db.rooms.toArray();
-        // If Cloud is empty or disabled, we seed the image-based inventory for the session
         if (existingRooms.length === 0) {
           await db.rooms.bulkPut(INITIAL_ROOMS);
         }
@@ -147,7 +151,7 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     await clearSessionData();
     setIsLoggedIn(false);
-    window.location.reload(); // Hard refresh to ensure no memory remains
+    window.location.reload(); 
   };
 
   const handleLogin = (role: UserRole, supervisor?: Supervisor) => {
@@ -227,7 +231,38 @@ const App: React.FC = () => {
           await db.guests.put(gu); 
           setGuests(guests.map(x => x.id === gu.id ? gu : x)); 
         }}
-        onShiftRoom={(newRid) => {}} onClose={() => setActiveBookingId(null)} />;
+        onShiftRoom={async (bookingId, newRoomId, reason) => {
+           const b = bookings.find(x => x.id === bookingId);
+           if (!b) return;
+           const oldRoomId = b.roomId;
+           const newR = rooms.find(x => x.id === newRoomId);
+           
+           // Update Booking
+           const updatedBooking = { ...b, roomId: newRoomId };
+           await db.bookings.put(updatedBooking);
+           
+           // Update Rooms status
+           const rs = rooms.map(rm => {
+              if (rm.id === oldRoomId) return { ...rm, status: RoomStatus.DIRTY, currentBookingId: undefined };
+              if (rm.id === newRoomId) return { ...rm, status: RoomStatus.OCCUPIED, currentBookingId: bookingId };
+              return rm;
+           });
+           await db.rooms.bulkPut(rs);
+           
+           // Log shift
+           const log: RoomShiftLog = {
+              id: `SHIFT-${Date.now()}`,
+              date: new Date().toISOString(),
+              bookingId,
+              guestName: g.name,
+              fromRoom: rooms.find(x => x.id === oldRoomId)?.number,
+              toRoom: newR?.number,
+              reason
+           };
+           await db.shiftLogs.put(log);
+           
+           refreshLocalState();
+        }} onClose={() => setActiveBookingId(null)} />;
     }
 
     if (showCheckinForm) {
@@ -261,11 +296,11 @@ const App: React.FC = () => {
       case 'FACILITY': return <FacilityModule guests={guests} bookings={bookings} rooms={rooms} settings={settings} />;
       case 'TRAVEL': return <TravelModule guests={guests} bookings={bookings} rooms={rooms} settings={settings} />;
       case 'GROUP': return <GroupModule groups={groups} setGroups={async (gs) => { setGroups(gs); await db.groups.bulkPut(gs); }} rooms={rooms} bookings={bookings} setBookings={async (bks) => { setBookings(bks); await db.bookings.bulkPut(bks); }} guests={guests} setGuests={setGuests} setRooms={async (rs) => { setRooms(rs); await db.rooms.bulkPut(rs); }} onAddTransaction={(tx) => { setTransactions([...transactions, tx]); db.transactions.put(tx); }} onGroupPayment={() => {}} settings={settings} />;
-      case 'INVENTORY': return <InventoryModule settings={settings} />;
+      case 'INVENTORY': return <InventoryModule settings={settings} setSettings={handleUpdateSettings} />;
       case 'ACCOUNTING': return <Accounting transactions={transactions} setTransactions={async (txs) => { setTransactions(txs); await db.transactions.bulkPut(txs); }} guests={guests} bookings={bookings} settings={settings} rooms={rooms} quotations={quotations} setQuotations={async (qs) => { setQuotations(qs); await db.quotations.bulkPut(qs); }} />;
       case 'PAYROLL': return <PayrollModule staff={supervisors} settings={settings} onUpdateTransactions={(tx) => { setTransactions([...transactions, tx]); db.transactions.put(tx); }} />;
       case 'REPORTS': return <Reports bookings={bookings} guests={guests} rooms={rooms} settings={settings} transactions={transactions} shiftLogs={[]} cleaningLogs={[]} quotations={quotations} />;
-      case 'SETTINGS': return <Settings settings={settings} setSettings={async (s)=>{await db.settings.put(s); setSettings(s);}} rooms={rooms} setRooms={(rs)=>setRooms(rs)} supervisors={supervisors} setSupervisors={async (sups) => { setSupervisors(sups); await db.supervisors.bulkPut(sups); }} />;
+      case 'SETTINGS': return <Settings settings={settings} setSettings={handleUpdateSettings} rooms={rooms} setRooms={(rs)=>setRooms(rs)} supervisors={supervisors} setSupervisors={async (sups) => { setSupervisors(sups); await db.supervisors.bulkPut(sups); }} />;
       default:
         return (
           <div className="p-4 md:p-8 lg:p-10 pb-40 relative animate-in fade-in duration-700">
@@ -276,14 +311,27 @@ const App: React.FC = () => {
                </div>
                <div className="flex flex-wrap gap-4 justify-center">
                   <button onClick={() => setShowReservationPipeline(true)} className="bg-white text-blue-900 border-2 border-blue-900 px-8 py-4 rounded-2xl font-black text-[11px] uppercase shadow-lg hover:bg-blue-900 hover:text-white transition-all">Reservations</button>
-                  <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedRoomIds(new Set()); }} className={`px-8 py-4 rounded-2xl font-black text-[11px] uppercase shadow-lg transition-all border-2 ${isSelectionMode ? 'bg-orange-600 border-orange-600 text-white animate-pulse' : 'bg-white border-blue-900 text-blue-900 hover:bg-slate-50'}`}>
-                    {isSelectionMode ? 'EXIT MULTI' : 'MULTI CHECK-IN'}
-                  </button>
+                  
+                  <div className="flex gap-2">
+                    <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedRoomIds(new Set()); }} className={`px-8 py-4 rounded-2xl font-black text-[11px] uppercase shadow-lg transition-all border-2 ${isSelectionMode ? 'bg-orange-600 border-orange-600 text-white animate-pulse' : 'bg-white border-blue-900 text-blue-900 hover:bg-slate-50'}`}>
+                      {isSelectionMode ? 'EXIT MULTI' : 'MULTI CHECK-IN'}
+                    </button>
+                    
+                    {isSelectionMode && selectedRoomIds.size > 0 && (
+                      <button 
+                        onClick={() => setShowCheckinForm(true)} 
+                        className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase shadow-2xl hover:bg-black transition-all animate-in zoom-in"
+                      >
+                        PROCEED ({selectedRoomIds.size} ROOMS)
+                      </button>
+                    )}
+                  </div>
+
                   <button onClick={() => setShowReservationForm(true)} className="bg-orange-600 text-white px-10 lg:px-14 py-4 rounded-2xl font-black text-[11px] uppercase shadow-2xl shadow-orange-500/30 hover:scale-105 transition-all">+ RESERVATION</button>
                </div>
             </div>
 
-            {Object.entries(roomsByBlock).sort().map(([block, blockRooms]) => {
+            {(Object.entries(roomsByBlock) as [string, Room[]][]).sort().map(([block, blockRooms]) => {
               const isAyodhya = block === 'Ayodhya';
               const blockTheme = isAyodhya ? 'text-blue-900' : 'text-orange-600';
               const blockIcon = isAyodhya ? '🔱' : '🚩';
@@ -385,7 +433,6 @@ const App: React.FC = () => {
           <Stat label="REPAIR" count={rooms.filter(r=>r.status===RoomStatus.REPAIR).length} color="text-slate-500" onClick={() => setStatusFilter(RoomStatus.REPAIR)} active={statusFilter === RoomStatus.REPAIR} />
         </div>
         
-        {/* REPLACED: NEW ENTERPRISE SYNC INDICATOR */}
         <div className={`px-6 py-2.5 rounded-[1.2rem] flex items-center gap-4 border-2 shadow-sm transition-all ${IS_CLOUD_ENABLED ? 'bg-emerald-50 border-emerald-500/30 text-emerald-700' : 'bg-blue-50 border-blue-500/30 text-blue-700'}`}>
            <div className="flex gap-1">
               <div className={`w-2 h-2 rounded-full ${IS_CLOUD_ENABLED ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500'}`}></div>

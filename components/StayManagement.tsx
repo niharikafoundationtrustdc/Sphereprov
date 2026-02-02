@@ -13,7 +13,7 @@ interface StayManagementProps {
   onUpdate: (booking: Booking) => void;
   onAddPayment: (bookingId: string, payment: Payment) => void;
   onUpdateGuest: (guest: Guest) => void;
-  onShiftRoom: (newRoomId: string) => void;
+  onShiftRoom: (bookingId: string, newRoomId: string, reason: string) => void;
   onClose: () => void;
 }
 
@@ -23,9 +23,12 @@ const StayManagement: React.FC<StayManagementProps> = ({
   const [showAddCharge, setShowAddCharge] = useState(false);
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [showPrintView, setShowPrintView] = useState(false);
+  const [showShiftConsole, setShowShiftConsole] = useState(false);
   
-  const [newCharge, setNewCharge] = useState({ description: '', amount: '' });
   const [newPayment, setNewPayment] = useState({ amount: '', method: 'Cash', remarks: '' });
+  const [newCharge, setNewCharge] = useState({ description: '', amount: '' });
+  const [newShift, setNewShift] = useState({ roomId: '', reason: '' });
+  const [extendDate, setExtendDate] = useState(booking.checkOutDate);
 
   const totals = useMemo(() => {
     const start = new Date(booking.checkInDate);
@@ -35,148 +38,247 @@ const StayManagement: React.FC<StayManagementProps> = ({
     const serviceCharges = (booking.charges || []).reduce((sum, c) => sum + c.amount, 0);
     const totalPayments = (booking.payments || []).reduce((sum, p) => sum + p.amount, 0);
     const discount = booking.discount || 0;
-    
     const taxable = roomRent + serviceCharges - discount;
     const tax = (taxable * (settings.taxRate || 0)) / 100;
     const grandTotal = taxable + tax;
     const balance = grandTotal - totalPayments;
-    
     return { roomRent, serviceCharges, totalPayments, discount, taxable, tax, grandTotal, balance, nights };
   }, [booking, settings.taxRate]);
 
   const handleCheckout = () => {
-    if (totals.balance > 0 && !confirm(`Unsettled Balance of ₹${totals.balance.toFixed(0)}. Checkout anyway?`)) return;
+    if (totals.balance > 0 && !confirm(`Unsettled Balance: ₹${totals.balance.toFixed(0)}. Checkout?`)) return;
     const now = new Date();
     onUpdate({ ...booking, status: 'COMPLETED', checkOutDate: now.toISOString().split('T')[0], checkOutTime: now.toTimeString().split(' ')[0].slice(0, 5) });
     onClose();
   };
 
+  const handlePostCharge = () => {
+     if (!newCharge.description || !newCharge.amount) return alert("Validation: Description and Amount required.");
+     const charge: Charge = {
+        id: `CHG-${Date.now()}`,
+        description: newCharge.description,
+        amount: parseFloat(newCharge.amount),
+        date: new Date().toISOString()
+     };
+     onUpdate({ ...booking, charges: [...(booking.charges || []), charge] });
+     setNewCharge({ description: '', amount: '' });
+     setShowAddCharge(false);
+  };
+
+  const handleExtendStay = () => {
+    if (extendDate === booking.checkOutDate) return;
+    onUpdate({ ...booking, checkOutDate: extendDate });
+    alert("Stay authorization extended.");
+  };
+
+  const handleExecuteShift = () => {
+     if (!newShift.roomId || !newShift.reason) return alert("Select new room and provide shift reason.");
+     onShiftRoom(booking.id, newShift.roomId, newShift.reason);
+     setShowShiftConsole(false);
+     onClose();
+  };
+
+  const availableForShift = useMemo(() => {
+     return allRooms.filter(r => r.status === RoomStatus.VACANT || r.status === RoomStatus.DIRTY);
+  }, [allRooms]);
+
   return (
-    <div className="fixed inset-0 z-50 bg-[#020617]/90 backdrop-blur-xl flex items-center justify-center p-0 md:p-4">
-      <div className="bg-[#0f172a] w-full max-w-7xl h-full md:h-[94vh] rounded-none md:rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden border border-white/10 animate-in slide-in-from-bottom-12 duration-500">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
+      <div className="bg-white w-full max-w-7xl h-full md:h-[94vh] rounded-none md:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200 animate-in slide-in-from-bottom-12">
         
-        <div className="bg-[#020617] p-10 text-white flex flex-col md:flex-row justify-between items-start md:items-center no-print flex-shrink-0 gap-6 border-b border-white/5">
-          <div className="flex items-center gap-10">
-            <button onClick={onClose} className="w-14 h-14 bg-white/5 rounded-[1.5rem] border border-white/10 flex items-center justify-center text-slate-500 hover:text-white transition-all">←</button>
+        <div className="bg-slate-50 p-8 border-b flex flex-col md:flex-row justify-between items-center no-print shrink-0 gap-6">
+          <div className="flex items-center gap-6">
+            <button onClick={onClose} className="w-12 h-12 bg-white border border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 hover:text-blue-600 transition-all shadow-sm">←</button>
             <div>
-              <h2 className="text-4xl font-black uppercase tracking-tighter leading-none">{guest.name}</h2>
-              <p className="text-[12px] font-black text-orange-500 uppercase tracking-[0.4em] mt-3">FOLIO MASTER: UNIT {room.number}</p>
+              <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900">{guest.name}</h2>
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">Room {room.number} • {room.type}</p>
             </div>
           </div>
-          
-          <div className="flex gap-4 w-full md:w-auto">
-             <button onClick={() => setShowPrintView(true)} className="flex-1 md:flex-none bg-orange-600 text-white px-10 py-5 rounded-2xl font-black uppercase text-xs shadow-2xl hover:scale-105 transition-all">GENERATE INVOICE</button>
-             <button onClick={handleCheckout} className="flex-1 md:flex-none bg-rose-600/20 border border-rose-600/50 text-rose-500 px-10 py-5 rounded-2xl font-black uppercase text-xs hover:bg-rose-600 hover:text-white transition-all">SET CHECKOUT</button>
+          <div className="flex gap-3">
+             <button onClick={() => setShowShiftConsole(true)} className="bg-white border-2 border-blue-600 text-blue-600 px-8 py-3 rounded-2xl font-black uppercase text-[10px] shadow-sm hover:bg-blue-600 hover:text-white transition-all">Shift Unit</button>
+             <button onClick={() => setShowPrintView(true)} className="bg-white border border-slate-200 px-8 py-3 rounded-2xl font-black uppercase text-[10px] shadow-sm hover:border-blue-600">Invoice Preview</button>
+             <button onClick={handleCheckout} className="bg-orange-600 text-white px-10 py-3 rounded-2xl font-black uppercase text-[10px] shadow-lg hover:bg-slate-900 transition-all">Authorize Checkout</button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-14 grid grid-cols-1 lg:grid-cols-4 gap-14 custom-scrollbar no-print bg-[#0a0f1e]">
-          <div className="lg:col-span-3 space-y-12">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-               <SummaryStat label="BALANCE" value={`₹${totals.balance.toFixed(0)}`} color="bg-rose-950/40 border-rose-500/30 text-rose-500" />
-               <SummaryStat label="RECEIVED" value={`₹${totals.totalPayments.toFixed(0)}`} color="bg-emerald-950/40 border-emerald-500/30 text-emerald-500" />
-               <SummaryStat label="DISCOUNT" value={`₹${totals.discount.toFixed(0)}`} color="bg-orange-950/40 border-orange-500/30 text-orange-500" />
-               <SummaryStat label="TOTAL BILL" value={`₹${totals.grandTotal.toFixed(0)}`} color="bg-blue-950/40 border-blue-500/30 text-blue-500" />
+        <div className="flex-1 overflow-y-auto p-10 grid grid-cols-1 lg:grid-cols-4 gap-10 bg-white">
+          <div className="lg:col-span-3 space-y-10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+               <SummaryStat label="BALANCE" value={`₹${totals.balance.toFixed(0)}`} color="bg-rose-50 text-rose-600 border-rose-100" />
+               <SummaryStat label="RECEIVED" value={`₹${totals.totalPayments.toFixed(0)}`} color="bg-emerald-50 text-emerald-600 border-emerald-100" />
+               <SummaryStat label="DISCOUNT" value={`₹${totals.discount.toFixed(0)}`} color="bg-orange-50 text-orange-600 border-orange-100" />
+               <SummaryStat label="BILL TOTAL" value={`₹${totals.grandTotal.toFixed(0)}`} color="bg-blue-50 text-blue-600 border-blue-100" />
             </div>
 
-            <section className="bg-[#111827] p-12 rounded-[4rem] border border-white/5 space-y-10 shadow-2xl">
-              <div className="flex justify-between items-center border-b border-white/5 pb-8">
-                <div>
-                   <h3 className="font-black text-white uppercase text-sm tracking-[0.2em]">Folio Chronology</h3>
-                   <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Stay Audit Trail</p>
-                </div>
-                <div className="flex gap-4">
-                   <button onClick={() => setShowAddCharge(true)} className="bg-slate-800 text-slate-300 px-6 py-3 rounded-xl font-black text-[10px] uppercase border border-white/5">POST CHARGE</button>
-                   <button onClick={() => setShowAddPayment(true)} className="bg-orange-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">POST RECEIPT</button>
+            <section className="bg-slate-50 p-10 rounded-[2.5rem] border border-slate-200 space-y-8">
+              <div className="flex justify-between items-center border-b pb-6">
+                <h3 className="font-black text-slate-900 uppercase text-sm">Folio Timeline</h3>
+                <div className="flex gap-2">
+                   <button onClick={() => setShowAddCharge(true)} className="bg-white border border-slate-200 px-4 py-2 rounded-xl text-[9px] font-black uppercase">Post Charge</button>
+                   <button onClick={() => setShowAddPayment(true)} className="bg-blue-600 text-white px-6 py-2 rounded-xl text-[9px] font-black uppercase shadow-lg">New Receipt</button>
                 </div>
               </div>
 
-              <div className="space-y-6">
-                 {/* Standard Stay Line */}
-                 <div className="flex justify-between items-center p-6 bg-slate-900 border border-white/5 rounded-[2rem]">
+              <div className="space-y-4">
+                 <div className="flex justify-between items-center p-5 bg-white border border-slate-100 rounded-2xl shadow-sm">
                     <div>
-                       <p className="text-[12px] font-black text-white uppercase">ROOM RENT ({room.type})</p>
-                       <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-widest">{totals.nights} NIGHTS @ ₹{booking.basePrice}</p>
+                       <p className="text-[11px] font-black text-slate-900 uppercase">Room Rent</p>
+                       <p className="text-[9px] font-bold text-slate-400 mt-1">{totals.nights} NIGHTS @ ₹{booking.basePrice}</p>
                     </div>
-                    <p className="text-xl font-black text-white">₹{totals.roomRent.toFixed(0)}</p>
+                    <p className="text-lg font-black text-slate-900">₹{totals.roomRent.toFixed(0)}</p>
                  </div>
-
                  {(booking.charges || []).map(c => (
-                   <div key={c.id} className="flex justify-between items-center p-6 bg-slate-900 border border-white/5 rounded-[2rem]">
+                   <div key={c.id} className="flex justify-between items-center p-5 bg-white border border-slate-100 rounded-2xl shadow-sm">
                       <div>
-                         <p className="text-[12px] font-black text-white uppercase">{c.description}</p>
-                         <p className="text-[9px] font-bold text-slate-500 mt-1 uppercase">{c.date.split('T')[0]}</p>
+                         <p className="text-[11px] font-black text-slate-900 uppercase">{c.description}</p>
+                         <p className="text-[8px] font-bold text-slate-400 mt-1">{c.date.split('T')[0]}</p>
                       </div>
-                      <p className="text-xl font-black text-orange-500">₹{c.amount.toFixed(0)}</p>
+                      <p className="text-lg font-black text-orange-600">₹{c.amount.toFixed(0)}</p>
                    </div>
                  ))}
-                 
                  {(booking.payments || []).map(p => (
-                   <div key={p.id} className="flex justify-between items-center p-6 bg-emerald-950/20 border border-emerald-500/20 rounded-[2rem]">
+                   <div key={p.id} className="flex justify-between items-center p-5 bg-emerald-50 border border-emerald-100 rounded-2xl shadow-sm">
                       <div>
-                         <p className="text-[12px] font-black text-emerald-500 uppercase">PAYMENT: {p.method}</p>
-                         <p className="text-[9px] font-bold text-emerald-900 mt-1 uppercase">{p.date.split('T')[0]}</p>
+                         <p className="text-[11px] font-black text-emerald-700 uppercase">Payment: {p.method}</p>
+                         <p className="text-[8px] font-bold text-emerald-400 mt-1">{p.date.split('T')[0]}</p>
                       </div>
-                      <p className="text-xl font-black text-emerald-400">−₹{p.amount.toFixed(0)}</p>
+                      <p className="text-lg font-black text-emerald-600">−₹{p.amount.toFixed(0)}</p>
                    </div>
                  ))}
               </div>
             </section>
           </div>
 
-          <div className="space-y-8">
-            <div className="bg-[#111827] p-10 rounded-[4rem] text-white shadow-2xl space-y-10 border border-white/5 text-center">
-              <div>
-                <p className="text-[11px] font-black uppercase text-slate-500 tracking-[0.4em] mb-4">BALANCE DUE</p>
-                <h3 className="text-6xl font-black tracking-tighter text-white">₹{totals.balance.toFixed(0)}</h3>
+          <div className="space-y-6">
+            <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl space-y-6">
+              <div className="text-center">
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-50 mb-3">Payable Balance</p>
+                <h3 className="text-5xl font-black tracking-tighter">₹{totals.balance.toFixed(0)}</h3>
               </div>
-              <button onClick={() => setShowAddPayment(true)} className="w-full bg-orange-600 text-white py-6 rounded-[2rem] font-black uppercase text-sm shadow-[0_20px_40px_rgba(230,92,0,0.2)] hover:scale-105 transition-all">SETTLE NOW</button>
+              <button onClick={() => setShowAddPayment(true)} className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black uppercase text-xs shadow-lg hover:scale-105 transition-all">Settle Account</button>
             </div>
-            
-            <div className="bg-[#020617] p-10 rounded-[3.5rem] border border-white/5 space-y-4 shadow-xl">
-               <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest text-center border-b border-white/5 pb-4">Folio Operations</h4>
-               <SidebarAction label="Assign Extra Bed" />
-               <SidebarAction label="Room Shift" />
-               <SidebarAction label="Apply Discount" />
-               <SidebarAction label="Merge Folio" />
+
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+               <h4 className="text-[10px] font-black uppercase text-slate-400 border-b pb-4 tracking-widest">Modify Stay</h4>
+               <div className="space-y-4">
+                  <div className="space-y-1">
+                     <label className="text-[9px] font-black uppercase text-slate-400 ml-1">New Checkout Date</label>
+                     <input type="date" className="w-full border-2 p-3 rounded-xl font-black text-xs bg-white text-slate-900 outline-none" value={extendDate} onChange={e => setExtendDate(e.target.value)} />
+                  </div>
+                  <button onClick={handleExtendStay} className="w-full bg-blue-900 text-white py-4 rounded-2xl font-black uppercase text-[10px] shadow-md hover:bg-black transition-all">Extend Authorization</button>
+               </div>
             </div>
           </div>
         </div>
 
+        {/* MODAL: POST CHARGE */}
+        {showAddCharge && (
+          <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+             <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-3xl animate-in zoom-in">
+                <div className="p-8 border-b bg-slate-50 flex justify-between items-center rounded-t-[2.5rem]">
+                   <h3 className="text-xl font-black text-slate-900 uppercase">Post Extra Charge</h3>
+                   <button onClick={() => setShowAddCharge(false)} className="text-slate-400 text-2xl font-black">×</button>
+                </div>
+                <div className="p-8 space-y-6">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Charge Description</label>
+                      <input type="text" className="w-full bg-white border-2 border-slate-200 p-4 rounded-xl text-sm font-black text-slate-900 outline-none focus:border-blue-500" placeholder="e.g. Extra Bed / Late Checkout" value={newCharge.description} onChange={e => setNewCharge({...newCharge, description: e.target.value})} />
+                   </div>
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Amount (₹)</label>
+                      <input type="number" className="w-full bg-white border-2 border-slate-200 p-4 rounded-xl text-2xl font-black text-blue-900 outline-none focus:border-blue-500" value={newCharge.amount} onChange={e => setNewCharge({...newCharge, amount: e.target.value})} />
+                   </div>
+                   <button onClick={handlePostCharge} className="w-full bg-blue-900 text-white py-5 rounded-2xl font-black uppercase text-xs shadow-xl">Commit to Folio</button>
+                </div>
+             </div>
+          </div>
+        )}
+
+        {/* MODAL: ROOM SHIFT */}
+        {showShiftConsole && (
+          <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+             <div className="bg-white rounded-[3rem] w-full max-w-3xl shadow-3xl animate-in zoom-in overflow-hidden flex flex-col max-h-[85vh]">
+                <div className="p-10 border-b bg-blue-900 text-white flex justify-between items-center">
+                   <div>
+                     <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Unit Shift Console</h3>
+                     <p className="text-[10px] font-bold uppercase text-blue-300 mt-2">Moving folio from {room.number} to a new unit</p>
+                   </div>
+                   <button onClick={() => setShowShiftConsole(false)} className="text-white/40 text-xs font-black uppercase">Dismiss</button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
+                   <div className="space-y-4">
+                      <h4 className="text-xs font-black uppercase text-slate-400 tracking-widest border-b pb-4">1. Select Destination Unit</h4>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-3">
+                         {availableForShift.map(r => (
+                           <button 
+                             key={r.id} 
+                             onClick={() => setNewShift({...newShift, roomId: r.id})}
+                             className={`aspect-square rounded-2xl border-2 font-black uppercase flex flex-col items-center justify-center transition-all ${newShift.roomId === r.id ? 'bg-blue-600 border-blue-600 text-white scale-110 shadow-xl' : 'bg-slate-50 border-white text-slate-300 hover:border-blue-200'}`}
+                           >
+                              <span className="text-lg leading-none">{r.number}</span>
+                              <span className="text-[7px] mt-1 opacity-60">{r.type.split(' ')[0]}</span>
+                           </button>
+                         ))}
+                      </div>
+                   </div>
+
+                   <div className="space-y-4">
+                      <h4 className="text-xs font-black uppercase text-slate-400 tracking-widest border-b pb-4">2. Protocol: Shift Justification</h4>
+                      <textarea 
+                        className="w-full bg-white border-2 p-5 rounded-[2rem] font-bold text-sm text-slate-900 outline-none focus:border-blue-500 h-32 resize-none shadow-inner" 
+                        placeholder="State reason for shifting (e.g. Guest Request, Technical Fault, Cleaning Needed)..."
+                        value={newShift.reason}
+                        onChange={e => setNewShift({...newShift, reason: e.target.value})}
+                      ></textarea>
+                   </div>
+                </div>
+                <div className="p-8 bg-slate-50 border-t flex gap-4">
+                   <button onClick={() => setShowShiftConsole(false)} className="flex-1 py-4 text-slate-400 font-black uppercase text-xs">Cancel Shift</button>
+                   <button onClick={handleExecuteShift} className="flex-[3] bg-blue-900 text-white py-4 rounded-2xl font-black uppercase text-sm shadow-xl hover:scale-[1.02] transition-all">Authorize Shift & Mark Old Unit Dirty</button>
+                </div>
+             </div>
+          </div>
+        )}
+
         {showAddPayment && (
-          <FolioModal title="Record Transaction" onClose={() => setShowAddPayment(false)}>
-            <div className="space-y-8">
-               <div className="space-y-2">
-                 <label className="text-[10px] font-black uppercase text-slate-500 ml-2">Amount to pay (₹)</label>
-                 <input type="number" className="w-full bg-[#111] border border-white/10 p-5 rounded-[2rem] text-4xl font-black text-white text-center outline-none focus:border-orange-500 transition-all" value={newPayment.amount} onChange={e => setNewPayment({...newPayment, amount: e.target.value})} />
-               </div>
-               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-500 ml-2">Mode</label>
-                <select className="w-full bg-[#111] border border-white/10 p-4 rounded-2xl font-black text-sm text-white" value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})}>
-                    <option value="Cash">Cash Account</option>
-                    <option value="UPI">Digital (Scan)</option>
-                    <option value="Card">Terminal (Card)</option>
-                </select>
-              </div>
-              <button onClick={() => {
-                const amt = parseFloat(newPayment.amount) || 0;
-                if(amt > 0) {
-                   onAddPayment(booking.id, { id: `PAY-${Date.now()}`, amount: amt, date: new Date().toISOString(), method: newPayment.method });
-                   setShowAddPayment(false);
-                   setNewPayment({ amount: '', method: 'Cash', remarks: '' });
-                }
-              }} className="w-full bg-emerald-600 text-white py-6 rounded-[2rem] font-black uppercase text-sm shadow-xl">VERIFY & POST RECEIPT</button>
-            </div>
-          </FolioModal>
+          <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+             <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-3xl animate-in zoom-in">
+                <div className="p-8 border-b bg-slate-50 flex justify-between items-center rounded-t-[2.5rem]">
+                   <h3 className="text-xl font-black text-slate-900 uppercase">Record Receipt</h3>
+                   <button onClick={() => setShowAddPayment(false)} className="text-slate-400 text-2xl font-black">×</button>
+                </div>
+                <div className="p-8 space-y-6">
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Amount (₹)</label>
+                      <input type="number" className="w-full bg-white border-2 border-slate-200 p-4 rounded-xl text-3xl font-black text-slate-900 text-center outline-none focus:border-blue-500" value={newPayment.amount} onChange={e => setNewPayment({...newPayment, amount: e.target.value})} />
+                   </div>
+                   <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase text-slate-400">Ledger</label>
+                      <select className="w-full bg-white border-2 border-slate-200 p-4 rounded-xl font-black text-sm text-slate-900" value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})}>
+                          <option value="Cash">Cash</option>
+                          <option value="UPI">UPI/Online</option>
+                          <option value="Card">Bank Card</option>
+                      </select>
+                   </div>
+                   <button onClick={() => {
+                      const amt = parseFloat(newPayment.amount) || 0;
+                      if(amt > 0) {
+                         onAddPayment(booking.id, { id: `PAY-${Date.now()}`, amount: amt, date: new Date().toISOString(), method: newPayment.method });
+                         setShowAddPayment(false);
+                      }
+                   }} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs shadow-xl">Post Payment</button>
+                </div>
+             </div>
+          </div>
         )}
 
         {showPrintView && (
-           <div className="fixed inset-0 z-[200] bg-[#020617] flex flex-col no-print-backdrop">
-              <div className="bg-black p-4 flex justify-between items-center no-print border-b border-white/5">
-                 <button onClick={() => setShowPrintView(false)} className="bg-white/5 border border-white/10 text-white px-8 py-2 rounded-xl font-black uppercase text-[10px]">CLOSE [X]</button>
-                 <button onClick={() => window.print()} className="bg-orange-600 text-white px-10 py-2 rounded-xl font-black uppercase text-[10px] shadow-lg">PRINT DOCUMENT</button>
+           <div className="fixed inset-0 z-[300] bg-white flex flex-col no-print-backdrop">
+              <div className="p-4 bg-slate-100 flex justify-between items-center no-print">
+                 <button onClick={() => setShowPrintView(false)} className="bg-white border px-6 py-2 rounded-xl text-[10px] font-black">Close [X]</button>
+                 <button onClick={() => window.print()} className="bg-blue-600 text-white px-8 py-2 rounded-xl text-[10px] font-black shadow-lg">Print Document</button>
               </div>
-              <div className="flex-1 overflow-y-auto p-14 bg-white/5 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-12 bg-slate-50 custom-scrollbar">
                  <InvoiceView guest={guest} booking={booking} room={room} settings={settings} payments={booking.payments || []} />
               </div>
            </div>
@@ -187,24 +289,9 @@ const StayManagement: React.FC<StayManagementProps> = ({
 };
 
 const SummaryStat = ({ label, value, color }: any) => (
-  <div className={`${color} p-8 rounded-[3rem] border shadow-2xl flex flex-col justify-center text-center`}>
-    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">{label}</p>
-    <p className="text-3xl font-black tracking-tighter leading-none">{value}</p>
-  </div>
-);
-
-const SidebarAction = ({ label, onClick }: any) => (
-  <button onClick={onClick} className="w-full py-4 px-8 rounded-2xl bg-white/5 border border-transparent text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:border-orange-500 transition-all text-left">
-    {label}
-  </button>
-);
-
-const FolioModal = ({ title, children, onClose }: any) => (
-  <div className="fixed inset-0 z-[250] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-    <div className="bg-[#0f172a] rounded-[4rem] w-full max-w-md overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)] border border-white/10 border-t-8 border-t-orange-600">
-      <div className="p-10 md:p-14">{children}</div>
-      <button onClick={onClose} className="w-full py-6 text-slate-600 font-black uppercase text-[10px] border-t border-white/5 hover:text-white transition-all">CANCEL REQUEST</button>
-    </div>
+  <div className={`p-6 rounded-[2rem] border-2 shadow-sm flex flex-col justify-center text-center ${color}`}>
+    <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-2">{label}</p>
+    <p className="text-2xl font-black tracking-tighter">{value}</p>
   </div>
 );
 

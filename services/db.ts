@@ -36,7 +36,8 @@ export class HotelSphereDB extends Dexie {
   constructor() {
     // New DB name 'Shubhkamna_Cloud_Engine' signifies moving away from local persistence
     super('Shubhkamna_Cloud_Engine');
-    this.version(1).stores({
+    // Explicitly cast to any to resolve 'version' property identification error which can occur in some TS environments when extending Dexie
+    (this as any).version(1).stores({
       rooms: 'id, number, status, type',
       guests: 'id, name, phone, email',
       bookings: 'id, bookingNo, roomId, guestId, status, checkInDate, checkOutDate, groupId',

@@ -74,7 +74,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
         <Tab active={activeTab === 'ENTRY'} onClick={() => setActiveTab('ENTRY')}>New Entry</Tab>
         <Tab active={activeTab === 'LEDGER'} onClick={() => setActiveTab('LEDGER')}>General Ledger</Tab>
         <Tab active={activeTab === 'CASHBOOK'} onClick={() => setActiveTab('CASHBOOK')}>Cash Register</Tab>
-        <Tab active={activeTab === 'ARCHIVE'} onClick={() => setActiveTab('ARCHIVE')}>Invoice Archive (Duplicates)</Tab>
+        <Tab active={activeTab === 'ARCHIVE'} onClick={() => setActiveTab('ARCHIVE')}>Invoice Archive</Tab>
       </div>
 
       <div className="flex-1 bg-white rounded-[3rem] shadow-sm border p-6 md:p-12 overflow-y-auto custom-scrollbar">
@@ -87,31 +87,31 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field label="Voucher Date">
-                   <input type="date" className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-slate-50 text-slate-900 outline-none focus:bg-white focus:border-blue-600 transition-all" value={date} onChange={e => setDate(e.target.value)} />
+                   <input type="date" className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={date} onChange={e => setDate(e.target.value)} />
                 </Field>
                 <Field label="Type">
-                   <select className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-slate-50 text-slate-900 outline-none focus:bg-white focus:border-blue-600 transition-all" value={type} onChange={e => setType(e.target.value as any)}>
+                   <select className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={type} onChange={e => setType(e.target.value as any)}>
                       <option value="RECEIPT">RECEIPT (+)</option>
                       <option value="PAYMENT">PAYMENT (-)</option>
                    </select>
                 </Field>
                 <Field label="Group">
-                   <select className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-slate-50 text-slate-900 outline-none focus:bg-white focus:border-blue-600 transition-all" value={group} onChange={e => setGroup(e.target.value as any)}>
+                   <select className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={group} onChange={e => setGroup(e.target.value as any)}>
                       {ACCOUNT_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
                    </select>
                 </Field>
                 <Field label="Entity Name">
-                   <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-slate-50 text-slate-900 outline-none focus:bg-white focus:border-blue-600 transition-all" value={targetGuest} onChange={e => setTargetGuest(e.target.value)} placeholder="Resident / Company" />
+                   <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={targetGuest} onChange={e => setTargetGuest(e.target.value)} placeholder="Resident / Company" />
                 </Field>
                 <Field label="Ledger">
-                   <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-slate-50 text-slate-900 outline-none focus:bg-white focus:border-blue-600 transition-all" value={ledger} onChange={e => setLedger(e.target.value)} placeholder="Cash / Bank / Online" />
+                   <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={ledger} onChange={e => setLedger(e.target.value)} placeholder="Cash / Bank / Online" />
                 </Field>
                 <Field label="Amount (₹)">
-                   <input type="number" className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-lg bg-blue-50/30 text-blue-900 outline-none focus:bg-white focus:border-blue-600 transition-all" value={amount} onChange={e => setAmount(e.target.value)} />
+                   <input type="number" className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-lg bg-white text-blue-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={amount} onChange={e => setAmount(e.target.value)} />
                 </Field>
                 <div className="col-span-full">
                    <Field label="Narration">
-                      <textarea className="w-full border-2 border-slate-100 p-5 rounded-[2rem] font-bold text-xs h-32 resize-none bg-slate-50 text-slate-900 outline-none focus:bg-white focus:border-blue-600 transition-all" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Explanation..."></textarea>
+                      <textarea className="w-full border-2 border-slate-100 p-5 rounded-[2rem] font-bold text-xs h-32 resize-none bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Explanation..."></textarea>
                    </Field>
                 </div>
              </div>
@@ -124,13 +124,13 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
              <div className="flex justify-between items-end border-b pb-8">
                 <div>
                    <h2 className="text-3xl font-black text-black uppercase tracking-tighter leading-none">Invoice Archive</h2>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Duplicate Bill Generator & History</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Historical Folio & Bill History</p>
                 </div>
                 <div className="w-80">
                    <input 
                      type="text" 
                      placeholder="Search by Name, Phone, Bill No..." 
-                     className="w-full border-2 border-slate-200 p-3.5 rounded-2xl font-black text-[11px] bg-slate-50 text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm"
+                     className="w-full border-2 border-slate-200 p-4 rounded-2xl font-black text-sm bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm"
                      value={archiveSearch}
                      onChange={e => setArchiveSearch(e.target.value)}
                    />
@@ -142,7 +142,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
                    const g = guests.find(guest => guest.id === b.guestId);
                    const r = rooms.find(rm => rm.id === b.roomId);
                    return (
-                      <div key={b.id} className="bg-slate-50 border-2 rounded-[2.5rem] p-8 flex flex-col justify-between hover:border-blue-600 hover:bg-white transition-all group shadow-sm">
+                      <div key={b.id} className="bg-white border-2 border-slate-100 rounded-[2.5rem] p-8 flex flex-col justify-between hover:border-blue-600 transition-all group shadow-sm">
                          <div>
                             <div className="flex justify-between items-start mb-6">
                                <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase ${b.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{b.status}</span>
@@ -153,9 +153,9 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
                          </div>
                          <button 
                            onClick={() => setViewingBooking(b)}
-                           className="mt-10 bg-white border-2 border-slate-200 py-3.5 rounded-2xl font-black uppercase text-[10px] group-hover:bg-blue-900 group-hover:border-blue-900 group-hover:text-white transition-all shadow-sm"
+                           className="mt-10 bg-slate-50 border-2 border-slate-100 py-3.5 rounded-2xl font-black uppercase text-[10px] group-hover:bg-blue-900 group-hover:border-blue-900 group-hover:text-white transition-all shadow-sm text-slate-400"
                          >
-                            Print Duplicate Bill
+                            View Digital Folio
                          </button>
                       </div>
                    );
@@ -168,10 +168,10 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
           <div className="space-y-10 animate-in fade-in duration-300">
              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b pb-8">
                 <h2 className="text-3xl font-black text-black uppercase tracking-tighter leading-none">{activeTab}</h2>
-                <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border">
-                   <input type="date" className="bg-white p-2 rounded-xl text-[10px] font-black text-slate-900" value={reportStart} onChange={e => setReportStart(e.target.value)} />
+                <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                   <input type="date" className="bg-white p-2 rounded-xl text-[10px] font-black text-slate-900 outline-none" value={reportStart} onChange={e => setReportStart(e.target.value)} />
                    <span className="text-xs font-black text-slate-400">TO</span>
-                   <input type="date" className="bg-white p-2 rounded-xl text-[10px] font-black text-slate-900" value={reportEnd} onChange={e => setReportEnd(e.target.value)} />
+                   <input type="date" className="bg-white p-2 rounded-xl text-[10px] font-black text-slate-900 outline-none" value={reportEnd} onChange={e => setReportEnd(e.target.value)} />
                 </div>
              </div>
              <div className="overflow-x-auto">
@@ -220,7 +220,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
 };
 
 const Tab: React.FC<{ active: boolean, onClick: () => void, children: React.ReactNode }> = ({ active, onClick, children }) => (
-  <button onClick={onClick} className={`px-6 md:px-10 py-3 md:py-4 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 ${active ? 'bg-blue-900 text-white shadow-lg' : 'bg-transparent text-slate-400 hover:text-blue-900 hover:bg-slate-50'}`}>{children}</button>
+  <button onClick={onClick} className={`px-6 md:px-10 py-3 md:py-4 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shrink-0 ${active ? 'bg-blue-900 text-white shadow-lg' : 'bg-transparent text-slate-400 hover:text-blue-900 hover:bg-white border-2 border-transparent hover:border-slate-100'}`}>{children}</button>
 );
 
 const Field: React.FC<{ label: string, children: React.ReactNode }> = ({ label, children }) => (

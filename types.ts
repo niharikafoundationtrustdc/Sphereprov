@@ -32,6 +32,11 @@ export interface Occupant {
   idBack?: string;
 }
 
+export interface MealPlanConfig {
+  name: string;
+  rate: number;
+}
+
 export interface AgentConfig {
   name: string;
   commission: number;
@@ -54,6 +59,8 @@ export interface Room {
   currentBookingId?: string;
   block: string;
   bedType: string;
+  defaultMealPlan?: string;
+  mealPlanRate?: number;
 }
 
 export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MANAGER' | 'RECEPTIONIST' | 'ACCOUNTANT' | 'SUPERVISOR' | 'WAITER' | 'CHEF' | 'STOREKEEPER';
@@ -74,7 +81,19 @@ export interface Supervisor {
   otherAllowances?: number;
   bankName?: string;
   accountNumber?: string;
+  bankIfsc?: string;
+  bankBranch?: string;
   uanNumber?: string;
+  dob?: string;
+  fatherName?: string;
+  address?: string;
+  familyAddress?: string;
+  alternatePhone?: string;
+  gender?: 'Male' | 'Female' | 'Other';
+  relationshipStatus?: string;
+  nominee?: string;
+  idDocument?: string;
+  additionalDocs?: string[]; // Array for 5 documents
 }
 
 export interface Guest {
@@ -154,6 +173,7 @@ export interface HostelSettings {
   agents: AgentConfig[];
   roomTypes: string[];
   mealPlans: string[];
+  mealPlanRates: MealPlanConfig[];
   floors: string[];
   blocks: BlockConfig[];
   bedTypes: string[];
