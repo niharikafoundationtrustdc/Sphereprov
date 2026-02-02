@@ -152,7 +152,7 @@ export interface Booking {
   purpose?: string;
 }
 
-export type TransactionType = 'RECEIPT' | 'PAYMENT' | 'JOURNAL';
+export type TransactionType = 'RECEIPT' | 'PAYMENT' | 'JOURNAL' | 'CONTRA';
 export type AccountGroupName = 'Capital' | 'Fixed Asset' | 'Current Asset' | 'Direct Expense' | 'Indirect Expense' | 'Direct Income' | 'Indirect Income' | 'Current Liability' | 'Operating';
 
 export interface Transaction {
@@ -161,6 +161,7 @@ export interface Transaction {
   type: TransactionType;
   accountGroup: AccountGroupName | string;
   ledger: string;
+  toLedger?: string; // For CONTRA entries
   amount: number;
   entityName?: string;
   description: string;
@@ -265,7 +266,29 @@ export type EventType = 'Birthday' | 'Wedding' | 'Corporate' | 'Other';
 export type DietaryType = 'VEG' | 'NON-VEG' | 'EGG';
 export type Facility = 'GYM' | 'POOL' | 'LAUNDRY';
 
-export interface Quotation { id: string; date: string; guestName: string; amount: number; remarks: string; }
+export interface Quotation { 
+  id: string; 
+  date: string; 
+  guestName: string; 
+  guestPhone: string;
+  guestAddress?: string;
+  type: 'WEDDING' | 'CORPORATE' | 'OTHER';
+  items: QuotationItem[];
+  taxRate: number;
+  discount: number;
+  totalAmount: number;
+  remarks: string; 
+  validityDays: number;
+}
+
+export interface QuotationItem {
+  id: string;
+  description: string;
+  qty: number;
+  rate: number;
+  amount: number;
+}
+
 export interface RoomShiftLog { id: string; date: string; bookingId: string; guestName?: string; fromRoom?: string; toRoom?: string; reason?: string; }
 export interface CleaningLog { id: string; date: string; roomId: string; staffName?: string; }
 export interface CateringItem { id: string; name: string; category: string; pricePerPlate: number; ingredients?: CateringIngredient[]; }

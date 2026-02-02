@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Room, RoomStatus, Guest, Booking, HostelSettings, Transaction, GroupProfile, UserRole, Supervisor, Quotation, RoomShiftLog } from './types.ts';
 import { INITIAL_ROOMS, STATUS_COLORS } from './constants.tsx';
@@ -23,8 +24,9 @@ import DiningModule from './components/DiningModule.tsx';
 import FacilityModule from './components/FacilityModule.tsx';
 import InventoryModule from './components/InventoryModule.tsx';
 import TravelModule from './components/TravelModule.tsx';
+import QuotationModule from './components/QuotationModule.tsx';
 
-type AppTab = 'DASHBOARD' | 'BANQUET' | 'DINING' | 'FACILITY' | 'TRAVEL' | 'GROUP' | 'INVENTORY' | 'ACCOUNTING' | 'PAYROLL' | 'REPORTS' | 'SETTINGS' | 'GUEST_PORTAL' | 'SUPERVISOR_PANEL';
+type AppTab = 'DASHBOARD' | 'BANQUET' | 'QUOTATION' | 'DINING' | 'FACILITY' | 'TRAVEL' | 'GROUP' | 'INVENTORY' | 'ACCOUNTING' | 'PAYROLL' | 'REPORTS' | 'SETTINGS' | 'GUEST_PORTAL' | 'SUPERVISOR_PANEL';
 
 const DEFAULT_SETTINGS: HostelSettings = {
   id: 'primary',
@@ -133,7 +135,7 @@ const App: React.FC = () => {
           const cloudOk = await checkCloudHealth();
           setIsCloudLive(cloudOk);
 
-          const tables = ['rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'settings'];
+          const tables = ['rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'settings', 'quotations'];
           for (const table of tables) {
             const cloudData = await pullFromCloud(table);
             if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) { 
@@ -181,6 +183,7 @@ const App: React.FC = () => {
       { tab: 'SUPERVISOR_PANEL', label: 'HOUSEKEEPING' },
       { tab: 'DINING', label: 'DINING POS' },
       { tab: 'BANQUET', label: 'BANQUETS' },
+      { tab: 'QUOTATION', label: 'QUOTATIONS' },
       { tab: 'FACILITY', label: 'FACILITIES' },
       { tab: 'TRAVEL', label: 'TRANSPORT' },
       { tab: 'GROUP', label: 'GROUPS' },
@@ -268,6 +271,7 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'SUPERVISOR_PANEL': return <SupervisorPanel staff={loggedInStaff} rooms={rooms} bookings={bookings} onUpdateRoom={async (ru) => { await db.rooms.put(ru); refreshLocalState(); }} />;
       case 'BANQUET': return <BanquetModule settings={settings} guests={guests} rooms={rooms} roomBookings={bookings} onUpdateBooking={async (bu) => { await db.bookings.put(bu); refreshLocalState(); }} />;
+      case 'QUOTATION': return <QuotationModule settings={settings} />;
       case 'DINING': return <DiningModule rooms={rooms} bookings={bookings} guests={guests} settings={settings} userRole={currentUserRole} />;
       case 'FACILITY': return <FacilityModule guests={guests} bookings={bookings} rooms={rooms} settings={settings} onUpdateBooking={async (bu) => { await db.bookings.put(bu); refreshLocalState(); }} />;
       case 'TRAVEL': return <TravelModule guests={guests} bookings={bookings} rooms={rooms} settings={settings} onUpdateBooking={async (bu) => { await db.bookings.put(bu); refreshLocalState(); }} />;

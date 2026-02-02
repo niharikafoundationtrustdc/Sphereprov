@@ -19,6 +19,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
   const [type, setType] = useState<TransactionType>('RECEIPT');
   const [amount, setAmount] = useState('');
   const [ledger, setLedger] = useState('Cash Account');
+  const [toLedger, setToLedger] = useState(''); // Only for Contra
   const [group, setGroup] = useState<AccountGroupName>('Operating');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [desc, setDesc] = useState('');
@@ -37,27 +38,52 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
     'Direct Income', 'Indirect Income', 'Current Liability', 'Operating'
   ];
 
-  const ledgers = useMemo(() => Array.from(new Set(transactions.map(t => t.ledger))), [transactions]);
-
   const handleEntry = () => {
-    if (!amount || !ledger) return alert("Please fill Amount and Ledger.");
+    if (!amount || !ledger) return alert("Please fill Amount and Source Ledger.");
+    if (type === 'CONTRA' && !toLedger) return alert("Please specify Destination Ledger for Contra entry.");
+
     const newTx: Transaction = {
       id: Math.random().toString(36).substr(2, 9),
       date,
       type, 
       amount: parseFloat(amount) || 0, 
       ledger, 
+      toLedger: type === 'CONTRA' ? toLedger : undefined,
       description: desc,
-      accountGroup: group,
-      entityName: targetGuest || 'General Node'
+      accountGroup: type === 'CONTRA' ? 'Current Asset' : group,
+      entityName: targetGuest || (type === 'CONTRA' ? 'Internal Transfer' : 'General Node')
     };
+    
     setTransactions([...transactions, newTx]);
-    setAmount(''); setDesc(''); setTargetGuest('');
-    alert(`Financial entry posted.`);
+    setAmount(''); setDesc(''); setTargetGuest(''); setToLedger('');
+    alert(`Financial ${type} entry posted.`);
   };
 
-  const ledgerTransactions = useMemo(() => transactions.filter(t => t.ledger === selectedLedger && t.date >= reportStart && t.date <= reportEnd), [transactions, selectedLedger, reportStart, reportEnd]);
-  const cashbookTransactions = useMemo(() => transactions.filter(t => t.ledger.toLowerCase().includes('cash') && t.date >= reportStart && t.date <= reportEnd), [transactions, reportStart, reportEnd]);
+  const processedTransactions = useMemo(() => {
+    // For Ledger/Cashbook, we need to treat Contra as two movements
+    const expanded: any[] = [];
+    transactions.forEach(t => {
+      if (t.type === 'CONTRA') {
+        // From Ledger (Credit)
+        expanded.push({ ...t, ledger: t.ledger, displayType: 'CONTRA_OUT' });
+        // To Ledger (Debit)
+        expanded.push({ ...t, ledger: t.toLedger, displayType: 'CONTRA_IN' });
+      } else {
+        expanded.push({ ...t, displayType: t.type });
+      }
+    });
+    return expanded;
+  }, [transactions]);
+
+  const ledgerTransactions = useMemo(() => 
+    processedTransactions.filter(t => t.ledger === selectedLedger && t.date >= reportStart && t.date <= reportEnd), 
+    [processedTransactions, selectedLedger, reportStart, reportEnd]
+  );
+
+  const cashbookTransactions = useMemo(() => 
+    processedTransactions.filter(t => t.ledger.toLowerCase().includes('cash') && t.date >= reportStart && t.date <= reportEnd), 
+    [processedTransactions, reportStart, reportEnd]
+  );
   
   const filteredArchive = useMemo(() => {
     if (!archiveSearch) return bookings.slice(-50).reverse();
@@ -89,33 +115,50 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
                 <Field label="Voucher Date">
                    <input type="date" className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={date} onChange={e => setDate(e.target.value)} />
                 </Field>
-                <Field label="Type">
+                <Field label="Entry Type">
                    <select className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={type} onChange={e => setType(e.target.value as any)}>
                       <option value="RECEIPT">RECEIPT (+)</option>
                       <option value="PAYMENT">PAYMENT (-)</option>
+                      <option value="CONTRA">CONTRA (Transfer)</option>
+                      <option value="JOURNAL">JOURNAL (Adjust)</option>
                    </select>
                 </Field>
-                <Field label="Group">
-                   <select className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={group} onChange={e => setGroup(e.target.value as any)}>
-                      {ACCOUNT_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-                   </select>
+
+                {type !== 'CONTRA' && (
+                  <Field label="Group">
+                    <select className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={group} onChange={e => setGroup(e.target.value as any)}>
+                        {ACCOUNT_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </Field>
+                )}
+
+                <Field label={type === 'CONTRA' ? "Source Ledger (From)" : "Main Ledger"}>
+                   <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={ledger} onChange={e => setLedger(e.target.value)} placeholder="Cash / Bank Account" />
                 </Field>
-                <Field label="Entity Name">
-                   <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={targetGuest} onChange={e => setTargetGuest(e.target.value)} placeholder="Resident / Company" />
-                </Field>
-                <Field label="Ledger">
-                   <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={ledger} onChange={e => setLedger(e.target.value)} placeholder="Cash / Bank / Online" />
-                </Field>
-                <Field label="Amount (₹)">
+
+                {type === 'CONTRA' && (
+                  <Field label="Destination Ledger (To)">
+                    <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={toLedger} onChange={e => setToLedger(e.target.value)} placeholder="Destination Bank/Cash" />
+                  </Field>
+                )}
+
+                {type !== 'CONTRA' && (
+                  <Field label="Party / Entity Name">
+                    <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={targetGuest} onChange={e => setTargetGuest(e.target.value)} placeholder="Resident / Company" />
+                  </Field>
+                )}
+
+                <Field label="Voucher Amount (₹)">
                    <input type="number" className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-lg bg-white text-blue-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={amount} onChange={e => setAmount(e.target.value)} />
                 </Field>
+
                 <div className="col-span-full">
-                   <Field label="Narration">
-                      <textarea className="w-full border-2 border-slate-100 p-5 rounded-[2rem] font-bold text-xs h-32 resize-none bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Explanation..."></textarea>
+                   <Field label="Narration / Remarks">
+                      <textarea className="w-full border-2 border-slate-100 p-5 rounded-[2rem] font-bold text-xs h-32 resize-none bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Provide explanation for audit trail..."></textarea>
                    </Field>
                 </div>
              </div>
-             <button onClick={handleEntry} className="bg-blue-900 text-white font-black px-12 py-5 rounded-3xl text-xs uppercase shadow-xl tracking-[0.2em] hover:bg-black transition-all">Authorize Entry</button>
+             <button onClick={handleEntry} className="bg-blue-900 text-white font-black px-12 py-5 rounded-3xl text-xs uppercase shadow-xl tracking-[0.2em] hover:bg-black transition-all">Authorize Posting</button>
           </div>
         )}
 
@@ -167,7 +210,20 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
         {(activeTab === 'LEDGER' || activeTab === 'CASHBOOK') && (
           <div className="space-y-10 animate-in fade-in duration-300">
              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b pb-8">
-                <h2 className="text-3xl font-black text-black uppercase tracking-tighter leading-none">{activeTab}</h2>
+                <div>
+                   <h2 className="text-3xl font-black text-black uppercase tracking-tighter leading-none">{activeTab === 'LEDGER' ? 'General Ledger' : 'Cash Book'}</h2>
+                   {activeTab === 'LEDGER' && (
+                     <div className="mt-4 flex items-center gap-2">
+                       <label className="text-[10px] font-black uppercase text-slate-400">Account Selection</label>
+                       <input 
+                        className="border-2 border-slate-100 p-2 rounded-xl font-black text-xs bg-white text-slate-900" 
+                        value={selectedLedger} 
+                        onChange={e => setSelectedLedger(e.target.value)} 
+                        placeholder="Search Account..."
+                       />
+                     </div>
+                   )}
+                </div>
                 <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
                    <input type="date" className="bg-white p-2 rounded-xl text-[10px] font-black text-slate-900 outline-none" value={reportStart} onChange={e => setReportStart(e.target.value)} />
                    <span className="text-xs font-black text-slate-400">TO</span>
@@ -177,17 +233,39 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
              <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                    <thead className="bg-slate-900 text-white font-black uppercase">
-                      <tr><th className="p-6">Date</th><th className="p-6">Narration</th><th className="p-6 text-right">Debit</th><th className="p-6 text-right">Credit</th></tr>
+                      <tr><th className="p-6">Date</th><th className="p-6">Type</th><th className="p-6">Narration</th><th className="p-6 text-right">Debit (In)</th><th className="p-6 text-right">Credit (Out)</th></tr>
                    </thead>
-                   <tbody className="divide-y font-bold uppercase text-slate-700">
-                      {(activeTab === 'LEDGER' ? ledgerTransactions : cashbookTransactions).map(t => (
-                        <tr key={t.id} className="hover:bg-slate-50">
-                           <td className="p-6 opacity-50">{t.date}</td>
-                           <td className="p-6">{t.description}</td>
-                           <td className="p-6 text-right text-red-600">{t.type === 'PAYMENT' ? `₹${t.amount}` : '-'}</td>
-                           <td className="p-6 text-right text-green-700">{t.type === 'RECEIPT' ? `₹${t.amount}` : '-'}</td>
-                        </tr>
-                      ))}
+                   <tbody className="divide-y font-bold uppercase text-slate-700 bg-white">
+                      {(activeTab === 'LEDGER' ? ledgerTransactions : cashbookTransactions).map((t, idx) => {
+                        const isDebit = t.displayType === 'RECEIPT' || t.displayType === 'CONTRA_IN';
+                        const isCredit = t.displayType === 'PAYMENT' || t.displayType === 'CONTRA_OUT';
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50">
+                             <td className="p-6 opacity-50">{t.date}</td>
+                             <td className="p-6">
+                                <span className={`px-3 py-1 rounded-full text-[8px] font-black ${
+                                  t.displayType.includes('CONTRA') ? 'bg-indigo-50 text-indigo-600' :
+                                  t.displayType === 'RECEIPT' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                                }`}>
+                                  {t.displayType.replace('_', ' ')}
+                                </span>
+                             </td>
+                             <td className="p-6">
+                               <p className="font-black">{t.description}</p>
+                               {t.type === 'CONTRA' && (
+                                 <p className="text-[8px] text-blue-400 mt-1">Transfer: {t.ledger} → {t.toLedger}</p>
+                               )}
+                               {t.entityName && t.type !== 'CONTRA' && <p className="text-[8px] text-slate-400 mt-1">Party: {t.entityName}</p>}
+                             </td>
+                             <td className="p-6 text-right text-green-700 font-black">
+                                {isDebit ? `₹${t.amount.toFixed(2)}` : '-'}
+                             </td>
+                             <td className="p-6 text-right text-red-600 font-black">
+                                {isCredit ? `₹${t.amount.toFixed(2)}` : '-'}
+                             </td>
+                          </tr>
+                        );
+                      })}
                    </tbody>
                 </table>
              </div>

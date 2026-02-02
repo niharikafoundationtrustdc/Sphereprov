@@ -104,25 +104,20 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleDeleteRoom = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    
     const room = rooms.find(r => r.id === id);
     if (!room) return;
-
     if (room.status === RoomStatus.OCCUPIED) {
-      alert("Operational Conflict: Cannot delete a room that is currently OCCUPIED. Please check out the guest first.");
+      alert("Operational Conflict: Cannot delete a room that is currently OCCUPIED.");
       return;
     }
-
-    if (!window.confirm(`DANGER: Permanently delete unit ${room.number}? This will also remove all associated historical bookings from the cloud. This action cannot be undone. Proceed?`)) return;
-
+    if (!window.confirm(`DANGER: Permanently delete unit ${room.number}?`)) return;
     try {
       await db.rooms.delete(id);
       const updatedRooms = rooms.filter(r => r.id !== id);
       setRooms(updatedRooms);
-      alert(`Unit ${room.number} permanently removed from inventory.`);
+      alert(`Unit ${room.number} permanently removed.`);
     } catch (err) {
-      console.error("Room Deletion Failure:", err);
-      alert("System Error: Could not remove unit. Please ensure you have an active internet connection and cloud permissions.");
+      alert("System Error: Could not remove unit.");
     }
   };
 
@@ -150,6 +145,23 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingStaff({ ...editingStaff, assignedRoomIds: next });
   };
 
+  const handleBulkAssign = (type: 'ALL' | 'NONE' | string) => {
+    if (!editingStaff) return;
+    let nextIds: string[] = [];
+    if (type === 'ALL') {
+      nextIds = rooms.map(r => r.id);
+    } else if (type === 'NONE') {
+      nextIds = [];
+    } else {
+      // Assume type is Block Name
+      const blockRoomIds = rooms.filter(r => r.block === type).map(r => r.id);
+      const current = editingStaff.assignedRoomIds || [];
+      // Combine unique IDs
+      nextIds = Array.from(new Set([...current, ...blockRoomIds]));
+    }
+    setEditingStaff({ ...editingStaff, assignedRoomIds: nextIds });
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, key: 'logo' | 'signature' | 'wallpaper') => {
     const file = e.target.files?.[0];
     if (file) {
@@ -162,7 +174,6 @@ const Settings: React.FC<SettingsProps> = ({
   return (
     <div className="p-6 md:p-10 bg-slate-50 min-h-full pb-40 text-slate-900 font-sans">
       <div className="max-w-7xl mx-auto space-y-10">
-        
         <div className="flex items-center gap-1 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm sticky top-4 z-20 overflow-x-auto scrollbar-hide no-print">
           <SubTab active={activeSubTab === 'GENERAL'} label="Property Profile" onClick={() => setActiveSubTab('GENERAL')} />
           <SubTab active={activeSubTab === 'MASTERS'} label="Global Masters" onClick={() => setActiveSubTab('MASTERS')} />
@@ -189,10 +200,9 @@ const Settings: React.FC<SettingsProps> = ({
                     ))}
                  </div>
               </MasterBox>
-
               <MasterBox title="Meal Plans & Rates">
                  <div className="flex gap-2 mb-4">
-                    <input className="flex-1 border border-slate-200 bg-white p-2 rounded-lg text-xs text-slate-900 outline-none focus:border-blue-500" placeholder="Plan (e.g. CP)" value={newMealName} onChange={e=>setNewMealName(e.target.value)} />
+                    <input className="flex-1 border border-slate-200 bg-white p-2 rounded-lg text-xs text-slate-900 outline-none focus:border-blue-500" placeholder="Plan" value={newMealName} onChange={e=>setNewMealName(e.target.value)} />
                     <input className="w-20 border border-slate-200 bg-white p-2 rounded-lg text-xs text-slate-900 outline-none focus:border-blue-500" placeholder="Rate ₹" type="number" value={newMealRate} onChange={e=>setNewMealRate(e.target.value)} />
                     <button onClick={addMealPlan} className="bg-orange-600 text-white px-4 py-2 rounded-lg text-xs font-black shadow-sm">ADD</button>
                  </div>
@@ -208,7 +218,6 @@ const Settings: React.FC<SettingsProps> = ({
                     ))}
                  </div>
               </MasterBox>
-
               {['roomTypes', 'floors', 'bedTypes'].map((field: any) => (
                 <MasterBox key={field} title={field.replace(/([A-Z])/g, ' $1').toUpperCase()}>
                    <div className="flex gap-2 mb-4">
@@ -329,7 +338,6 @@ const Settings: React.FC<SettingsProps> = ({
                    <button onClick={handleSaveRoom} className="lg:col-span-1 bg-blue-600 text-white py-4 rounded-2xl font-black uppercase text-xs shadow-lg hover:bg-slate-900 transition-all">{editingRoomId ? 'Update Room' : 'Add to Inventory'}</button>
                 </div>
              </section>
-
              <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
                 <table className="w-full text-left text-xs">
                    <thead className="bg-slate-50 text-slate-400 font-black uppercase">
@@ -393,8 +401,20 @@ const Settings: React.FC<SettingsProps> = ({
                  </div>
 
                  <div className="space-y-4 pt-4 border-t">
-                    <h4 className="text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]">Assign Units for Oversight</h4>
-                    <p className="text-[9px] text-slate-400 uppercase font-bold italic">Staff will only see these units in their maintenance dashboard</p>
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                       <div className="space-y-1">
+                          <h4 className="text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]">Assign Units for Oversight</h4>
+                          <p className="text-[9px] text-slate-400 uppercase font-bold italic">Mapped units for maintenance dashboard</p>
+                       </div>
+                       <div className="flex flex-wrap gap-2">
+                          <button onClick={() => handleBulkAssign('ALL')} className="bg-blue-900 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase shadow-sm">All</button>
+                          <button onClick={() => handleBulkAssign('NONE')} className="bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase shadow-sm">None</button>
+                          {tempSettings.blocks.map(b => (
+                             <button key={b.id} onClick={() => handleBulkAssign(b.name)} className="bg-blue-50 text-blue-600 border border-blue-100 px-4 py-2 rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">{b.name}</button>
+                          ))}
+                       </div>
+                    </div>
+                    
                     <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 max-h-[300px] overflow-y-auto p-2 bg-slate-50 rounded-2xl border custom-scrollbar">
                        {[...rooms].sort((a,b) => a.number.localeCompare(b.number, undefined, {numeric: true})).map(r => (
                           <button 
