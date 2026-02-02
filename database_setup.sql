@@ -1,6 +1,6 @@
 
 -- HOTEL SPHERE PRO: COMPREHENSIVE MASTER DATABASE SETUP
--- VERSION: 5.3.0
+-- VERSION: 5.3.1 (Fix: Room Deletion Cascade)
 -- TARGET: SUPABASE POSTGRESQL
 
 -- 1. PROPERTY BLUEPRINT
@@ -52,11 +52,11 @@ CREATE TABLE IF NOT EXISTS guests (
     "visaDateOfExpiry" TEXT
 );
 
--- 2. OPERATIONAL FLOW
+-- 2. OPERATIONAL FLOW (Enhanced with Cascade Delete)
 CREATE TABLE IF NOT EXISTS bookings (
     id TEXT PRIMARY KEY,
     "bookingNo" TEXT NOT NULL,
-    "roomId" TEXT NOT NULL REFERENCES rooms(id),
+    "roomId" TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
     "guestId" TEXT NOT NULL REFERENCES guests(id),
     "groupId" TEXT,
     "checkInDate" DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -339,4 +339,18 @@ CREATE TABLE IF NOT EXISTS settings (
 
 -- 10. REFRESH & SEED
 INSERT INTO settings (id, name) VALUES ('primary', 'Hotel Sphere Pro') ON CONFLICT (id) DO NOTHING;
+
+-- MIGRATION: REFRESH CONSTRAINTS FOR ROOM DELETION
+-- This ensures existing deployments allow cascading room deletions
+DO $$ 
+BEGIN 
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'bookings_roomId_fkey') THEN
+        ALTER TABLE bookings DROP CONSTRAINT bookings_roomId_fkey;
+    END IF;
+    
+    ALTER TABLE bookings 
+    ADD CONSTRAINT bookings_roomId_fkey 
+    FOREIGN KEY ("roomId") REFERENCES rooms(id) ON DELETE CASCADE;
+END $$;
+
 NOTIFY pgrst, 'reload schema';

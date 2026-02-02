@@ -114,7 +114,7 @@ const SuperAdminPanel: React.FC<SuperAdminPanelProps> = ({ settings, setSettings
                             <tr><th className="p-6">Unit</th><th className="p-6">Category</th><th className="p-6">Status</th><th className="p-6 text-right">Standard Rate</th></tr>
                          </thead>
                          <tbody className="text-white/80 font-bold uppercase divide-y divide-white/5">
-                            {rooms.map(r => (
+                            {(rooms || []).map(r => (
                                <tr key={r.id} className="hover:bg-white/5 transition-colors">
                                   <td className="p-6 font-black text-lg text-white">Room {r.number}</td>
                                   <td className="p-6 opacity-60">{r.type}</td>
@@ -181,18 +181,12 @@ const SuperAdminPanel: React.FC<SuperAdminPanelProps> = ({ settings, setSettings
                       </div>
                    </div>
                    <div className="bg-slate-900 p-8 rounded-3xl border border-white/5 font-mono text-[9px] text-blue-300 leading-relaxed overflow-x-auto h-80 overflow-y-auto custom-scrollbar">
-{`-- HOTELSPHERE PRO: MASTER SETUP (RECONSTRUCT TABLES) --
-CREATE TABLE IF NOT EXISTS rooms (id TEXT PRIMARY KEY, number TEXT, floor INT, type TEXT, price NUMERIC, status TEXT, "currentBookingId" TEXT);
-CREATE TABLE IF NOT EXISTS guests (id TEXT PRIMARY KEY, name TEXT, phone TEXT, email TEXT, address TEXT, city TEXT, state TEXT, nationality TEXT, "idNumber" TEXT, adults INT, children INT, kids INT, others INT, documents JSONB);
-CREATE TABLE IF NOT EXISTS bookings (id TEXT PRIMARY KEY, "bookingNo" TEXT, "roomId" TEXT, "guestId" TEXT, "groupId" TEXT, "checkInDate" TEXT, "checkInTime" TEXT, "checkOutDate" TEXT, "checkOutTime" TEXT, status TEXT, charges JSONB, payments JSONB, "basePrice" NUMERIC, discount NUMERIC, mealPlan TEXT, agent TEXT, purpose TEXT, company TEXT);
-CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, date TEXT, type TEXT, "accountGroup" TEXT, ledger TEXT, amount NUMERIC, "entityName" TEXT, description TEXT, "referenceId" TEXT);
-CREATE TABLE IF NOT EXISTS groups (id TEXT PRIMARY KEY, "groupName" TEXT, "groupType" TEXT, "headName" TEXT, phone TEXT, email TEXT, "orgName" TEXT, "gstNumber" TEXT, "billingPreference" TEXT, documents JSONB, status TEXT);
-CREATE TABLE IF NOT EXISTS settings (id TEXT PRIMARY KEY, name TEXT, address TEXT, agents JSONB, "roomTypes" JSONB);
-CREATE TABLE IF NOT EXISTS "shiftLogs" (id TEXT PRIMARY KEY, "bookingId" TEXT, "guestName" TEXT, "fromRoom" TEXT, "toRoom" TEXT, date TEXT, reason TEXT);
-CREATE TABLE IF NOT EXISTS "cleaningLogs" (id TEXT PRIMARY KEY, "roomId" TEXT, date TEXT, "staffName" TEXT);
-CREATE TABLE IF NOT EXISTS quotations (id TEXT PRIMARY KEY, date TEXT, "guestName" TEXT, amount NUMERIC, remarks TEXT);
+{`-- FIXED: Ensure 'bedType' and other columns exist --
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "bedType" TEXT DEFAULT 'Double Bed';
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "defaultMealPlan" TEXT;
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "mealPlanRate" NUMERIC DEFAULT 0;
 
--- ENSURE ALL COLUMNS (FIX FOR SCHEMA MISMATCH) --
+-- ENSURE ALL OTHER COLUMNS (FIX FOR SCHEMA MISMATCH) --
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS "surName" TEXT;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS "givenName" TEXT;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS "gender" TEXT;
@@ -208,19 +202,6 @@ ALTER TABLE guests ADD COLUMN IF NOT EXISTS "visaType" TEXT;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS "visaPlaceOfIssue" TEXT;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS "visaDateOfIssue" TEXT;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS "visaDateOfExpiry" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "embassyCountry" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "arrivalFrom" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "nextDestination" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "arrivalInIndiaDate" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "stayDurationIndia" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "purposeOfVisit" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "employedInIndia" BOOLEAN;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "contactInIndia" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "cellInIndia" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "residingCountryContact" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "addressInIndia" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "applicationId" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "remarks" TEXT;
 
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "secondaryGuest" JSONB;
 
@@ -233,15 +214,11 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS "sgstRate" NUMERIC;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS "igstRate" NUMERIC;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS "hsnCode" TEXT;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS "upiId" TEXT;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "adminPassword" TEXT;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "receptionistPassword" TEXT;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "accountantPassword" TEXT;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "supervisorPassword" TEXT;
 
 -- REFRESH CACHE
 NOTIFY pgrst, 'reload schema';`}
                    </div>
-                   <p className="text-[10px] text-white/30 font-bold uppercase text-center italic">Run the above SQL in the Supabase Dashboard SQL Editor to resolve all sync mismatches.</p>
+                   <p className="text-[10px] text-white/30 font-bold uppercase text-center italic">Run the above SQL in the Supabase Dashboard SQL Editor to resolve "Could not find column" errors.</p>
                 </section>
              </div>
            )}

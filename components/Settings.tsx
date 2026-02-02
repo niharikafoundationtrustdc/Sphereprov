@@ -93,6 +93,7 @@ const Settings: React.FC<SettingsProps> = ({
     setRooms(next);
     setEditingRoomId(null);
     setNewRoom({ number: '', block: '', floor: '', type: '', price: 0, bedType: 'Double Bed', defaultMealPlan: '', mealPlanRate: 0 });
+    alert("Unit information synced to master inventory.");
   };
 
   const handleEditRoom = (room: Room) => {
@@ -103,9 +104,32 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleDeleteRoom = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!window.confirm("Permanently delete unit?")) return;
-    await db.rooms.delete(id);
-    setRooms(rooms.filter(r => r.id !== id));
+    
+    const room = rooms.find(r => r.id === id);
+    if (!room) return;
+
+    // Safety guard: prevent deletion of occupied rooms
+    if (room.status === RoomStatus.OCCUPIED) {
+      alert("Operational Conflict: Cannot delete a room that is currently OCCUPIED. Please check out the guest first.");
+      return;
+    }
+
+    if (!window.confirm(`DANGER: Permanently delete unit ${room.number}? This will also remove all associated historical bookings from the cloud. This action cannot be undone. Proceed?`)) return;
+
+    try {
+      // 1. Delete from local database (Dexie)
+      // This will trigger the Dexie hook to call Supabase removeFromCloud
+      await db.rooms.delete(id);
+      
+      // 2. Update React state for instant feedback
+      const updatedRooms = rooms.filter(r => r.id !== id);
+      setRooms(updatedRooms);
+      
+      alert(`Unit ${room.number} permanently removed from inventory.`);
+    } catch (err) {
+      console.error("Room Deletion Failure:", err);
+      alert("System Error: Could not remove unit. Please ensure you have an active internet connection and cloud permissions.");
+    }
   };
 
   const handleStaffSave = async () => {
@@ -315,7 +339,7 @@ const Settings: React.FC<SettingsProps> = ({
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100 font-bold uppercase text-slate-700">
-                      {rooms.sort((a,b) => a.number.localeCompare(b.number, undefined, {numeric:true})).map(r => (
+                      {[...rooms].sort((a,b) => a.number.localeCompare(b.number, undefined, {numeric:true})).map(r => (
                         <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                            <td className="p-6 text-lg font-black text-slate-900">{r.number} <span className="text-[8px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded ml-2">{r.block}</span></td>
                            <td className="p-6">{r.type}</td>

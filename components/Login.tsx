@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { UserRole, HostelSettings, Supervisor } from '../types.ts';
 
@@ -59,12 +58,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, settings, supervisors }) => {
         
         {/* Branding Area */}
         <div className="text-center space-y-4">
-          <div className="w-24 h-24 bg-[#e65c00] rounded-3xl flex items-center justify-center text-white text-4xl font-black mx-auto shadow-[0_20px_50px_rgba(230,92,0,0.3)]">
-            HS
+          <div className="w-24 h-24 bg-emerald-700 rounded-3xl flex items-center justify-center text-white text-4xl font-black mx-auto shadow-[0_20px_50px_rgba(4,120,87,0.3)]">
+            SH
           </div>
           <div>
-            <h1 className="text-4xl font-black text-[#1a2b4b] uppercase tracking-tight leading-none">HOTEL SPHERE PRO</h1>
-            <p className="text-[11px] font-black text-[#e65c00] uppercase tracking-[0.4em] mt-3">SPHERE CLOUD IDENTITY</p>
+            <h1 className="text-4xl font-black text-[#1a2b4b] uppercase tracking-tight leading-none">SHUBHKAMNA</h1>
+            <p className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.4em] mt-3">HOTEL AND RESORTS</p>
           </div>
         </div>
 
@@ -79,8 +78,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, settings, supervisors }) => {
                 onClick={() => { setSelectedRole(role); setError(''); }} 
                 className={`px-5 py-3 rounded-2xl font-black text-[10px] uppercase transition-all duration-300 border ${
                   selectedRole === role 
-                    ? 'bg-[#e65c00] border-[#e65c00] text-white shadow-[0_10px_20px_rgba(230,92,0,0.2)] scale-105' 
-                    : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50 hover:border-slate-200'
+                    ? 'bg-emerald-800 border-emerald-800 text-white shadow-[0_10px_20px_rgba(4,120,87,0.2)] scale-105' 
+                    : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50 hover:border-emerald-200'
                 }`}
               >
                 {role === 'CHEF' ? 'KITCHEN' : role === 'SUPERVISOR' ? 'HOUSEKEEPING' : role}
@@ -97,8 +96,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, settings, supervisors }) => {
               <input 
                 type="text" 
                 required 
-                placeholder="e.g. s@gmail.com"
-                className="w-full bg-slate-50 border-2 border-transparent focus:border-[#e65c00] p-5 rounded-2xl font-black text-xs text-slate-900 outline-none transition-all shadow-inner" 
+                placeholder="e.g. r@gmail.com"
+                className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-700 p-5 rounded-2xl font-black text-xs text-slate-900 outline-none transition-all shadow-inner" 
                 value={username} 
                 onChange={e => setUsername(e.target.value)} 
               />
@@ -109,7 +108,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, settings, supervisors }) => {
                 type="password" 
                 required 
                 placeholder="••••••••"
-                className="w-full bg-slate-50 border-2 border-transparent focus:border-[#e65c00] p-5 rounded-2xl font-black text-xs text-slate-900 outline-none transition-all shadow-inner" 
+                className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-700 p-5 rounded-2xl font-black text-xs text-slate-900 outline-none transition-all shadow-inner" 
                 value={password} 
                 onChange={e => setPassword(e.target.value)} 
               />
@@ -134,7 +133,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, settings, supervisors }) => {
             href="https://digitalcommunique.in/" 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="text-[11px] font-black text-slate-400 hover:text-[#e65c00] transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+            className="text-[11px] font-black text-slate-400 hover:text-emerald-700 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
           >
             POWERED BY DIGITAL COMMUNIQUE PRIVATE LIMITED
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>

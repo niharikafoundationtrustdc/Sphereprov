@@ -270,7 +270,7 @@ export interface RoomShiftLog { id: string; date: string; bookingId: string; gue
 export interface CleaningLog { id: string; date: string; roomId: string; staffName?: string; }
 export interface CateringItem { id: string; name: string; category: string; pricePerPlate: number; ingredients?: CateringIngredient[]; }
 export interface RestaurantOutlet { id: string; name: string; type: string; }
-export interface MenuItem { id: string; name: string; category: string; subcategory: string; price: number; outletId: string; isAvailable: boolean; dietaryType: DietaryType; }
+export interface MenuItem { id: string; name: string; category: string; subcategory: string; price: number; outletId: string; isAvailable: boolean; dietaryType: DietaryType; photo?: string; }
 export interface DiningTable { id: string; number: string; outletId: string; status: 'VACANT' | 'OCCUPIED'; }
 export interface KOT { id: string; tableId: string; outletId: string; waiterId: string; items: any[]; status: 'PENDING' | 'PREPARING' | 'SERVED'; timestamp: string; bookingId?: string; }
 export interface DiningBill { id: string; billNo: string; date: string; outletId: string; tableNumber: string; items: any[]; subTotal: number; taxAmount: number; grandTotal: number; paymentMode: string; guestName: string; guestPhone: string; roomBookingId?: string; }

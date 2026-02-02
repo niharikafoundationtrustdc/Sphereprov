@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/db';
-import { TravelBooking, Guest, Booking, Room, Transaction } from '../types';
+import { TravelBooking, Guest, Booking, Room, Transaction, Payment } from '../types';
 
 interface TravelModuleProps {
   guests: Guest[];
@@ -17,10 +16,11 @@ const TravelModule: React.FC<TravelModuleProps> = ({ guests, bookings, rooms, se
   const [guestSearch, setGuestSearch] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   
-  const [formData, setFormData] = useState<Partial<TravelBooking>>({
+  const [formData, setFormData] = useState<Partial<TravelBooking> & { instantPaid: boolean, paymentMode: string }>({
     guestId: '', guestName: '', vehicleType: 'Sedan', vehicleNumber: '', driverName: '',
     pickupLocation: 'Property Lobby', dropLocation: '', date: new Date().toISOString().split('T')[0],
-    time: '10:00', kmUsed: 0, daysOfTravelling: 1, amount: 0, status: 'BOOKED'
+    time: '10:00', kmUsed: 0, daysOfTravelling: 1, amount: 0, status: 'BOOKED',
+    instantPaid: false, paymentMode: 'Cash'
   });
 
   useEffect(() => {
@@ -34,16 +34,40 @@ const TravelModule: React.FC<TravelModuleProps> = ({ guests, bookings, rooms, se
     setIsProcessing(true);
     try {
       const t: TravelBooking = {
-        ...formData,
         id: `TRV-${Date.now()}`,
-      } as TravelBooking;
+        guestId: formData.guestId || '',
+        guestName: formData.guestName || '',
+        vehicleType: formData.vehicleType || 'Sedan',
+        vehicleNumber: formData.vehicleNumber || '',
+        driverName: formData.driverName || '',
+        pickupLocation: formData.pickupLocation || '',
+        dropLocation: formData.dropLocation || '',
+        date: formData.date || '',
+        time: formData.time || '',
+        kmUsed: formData.kmUsed || 0,
+        daysOfTravelling: formData.daysOfTravelling || 1,
+        amount: formData.amount || 0,
+        status: formData.status || 'BOOKED',
+        roomBookingId: formData.roomBookingId
+      };
 
       await db.travelBookings.put(t);
       
-      // Auto-bill to room if link exists
+      // SYNC TO ROOM FOLIO IF RESIDENT
       if (formData.roomBookingId) {
         const b = bookings.find(x => x.id === formData.roomBookingId);
         if (b) {
+          let updatedPayments = b.payments || [];
+          if (formData.instantPaid) {
+            updatedPayments = [...updatedPayments, {
+              id: `PAY-TRV-${Date.now()}`,
+              amount: t.amount,
+              date: new Date().toISOString(),
+              method: formData.paymentMode,
+              remarks: `Immediate Transport Payment: ${t.vehicleType}`
+            }];
+          }
+
           const updated = { 
             ...b, 
             charges: [...(b.charges || []), { 
@@ -51,19 +75,19 @@ const TravelModule: React.FC<TravelModuleProps> = ({ guests, bookings, rooms, se
               description: `Transport: ${t.vehicleType} (${t.vehicleNumber})`, 
               amount: t.amount, 
               date: new Date().toISOString() 
-            }] 
+            }],
+            payments: updatedPayments
           };
           await db.bookings.put(updated);
           if (onUpdateBooking) onUpdateBooking(updated);
         }
       } else {
-        // Log transaction for standalone transport payments so they reflect in Reports
         const tx: Transaction = {
           id: `TX-TRV-${Date.now()}`,
           date: new Date().toISOString().split('T')[0],
           type: 'RECEIPT',
           accountGroup: 'Direct Income',
-          ledger: 'Cash Account',
+          ledger: `${formData.paymentMode} Account`,
           amount: t.amount,
           entityName: t.guestName,
           description: `Transport Service: ${t.vehicleType} (${t.vehicleNumber})`
@@ -73,16 +97,17 @@ const TravelModule: React.FC<TravelModuleProps> = ({ guests, bookings, rooms, se
 
       setActiveBookings([t, ...activeBookings]);
       setShowForm(false);
-      alert(`✅ Transport authorized. Charges recorded in ${formData.roomBookingId ? 'Room Folio' : 'Collection Report'}.`);
+      alert(`✅ Transport Protocol Committed. Linked to ${formData.roomBookingId ? 'Room Folio' : 'Standalone Billing'}.`);
       
       setFormData({
         guestId: '', guestName: '', vehicleType: 'Sedan', vehicleNumber: '', driverName: '',
         pickupLocation: 'Property Lobby', dropLocation: '', date: new Date().toISOString().split('T')[0],
-        time: '10:00', kmUsed: 0, daysOfTravelling: 1, amount: 0, status: 'BOOKED'
+        time: '10:00', kmUsed: 0, daysOfTravelling: 1, amount: 0, status: 'BOOKED',
+        instantPaid: false, paymentMode: 'Cash'
       });
       setGuestSearch('');
     } catch (err) {
-      alert("Error saving record. Please check console.");
+      alert("System Conflict: Could not save travel record.");
     } finally {
       setIsProcessing(false);
     }
@@ -106,7 +131,7 @@ const TravelModule: React.FC<TravelModuleProps> = ({ guests, bookings, rooms, se
           <h2 className="text-3xl font-black text-blue-900 uppercase tracking-tighter leading-none">Travel Desk Console</h2>
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] mt-2">Fleet Management & Guest Logistics Portal</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="bg-blue-900 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-black transition-all hover:scale-105">+ New Transport</button>
+        <button onClick={() => setShowForm(true)} className="bg-blue-900 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-black transition-all hover:scale-105">+ New Dispatch</button>
       </div>
 
       <div className="flex-1 bg-white border-2 rounded-[3.5rem] shadow-sm overflow-hidden flex flex-col h-full">
@@ -134,22 +159,12 @@ const TravelModule: React.FC<TravelModuleProps> = ({ guests, bookings, rooms, se
                           <p className="text-[10px] font-bold text-slate-400 mt-1">{t.vehicleNumber} • {t.driverName}</p>
                        </td>
                        <td className="p-8 text-[11px]">
-                          <div className="flex items-center gap-3">
-                             <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                             {t.pickupLocation}
-                          </div>
-                          <div className="flex items-center gap-3 mt-1.5 opacity-60">
-                             <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                             {t.dropLocation}
-                          </div>
+                          <div className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>{t.pickupLocation}</div>
+                          <div className="flex items-center gap-3 mt-1.5 opacity-60"><div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>{t.dropLocation}</div>
                        </td>
-                       <td className="p-8 text-center text-[10px]">
-                          <div className="bg-slate-100 px-3 py-1 rounded-lg inline-block">{t.kmUsed} KM • {t.daysOfTravelling} Days</div>
-                       </td>
+                       <td className="p-8 text-center text-[10px]"><div className="bg-slate-100 px-3 py-1 rounded-lg inline-block">{t.kmUsed} KM • {t.daysOfTravelling} Days</div></td>
                        <td className="p-8 text-right font-black text-2xl text-blue-900">₹{t.amount.toFixed(2)}</td>
-                       <td className="p-8 text-center">
-                          <span className={`px-4 py-1.5 rounded-full text-[9px] font-black border uppercase shadow-sm ${t.status === 'BOOKED' ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-green-50 border-green-100 text-green-600'}`}>{t.status}</span>
-                       </td>
+                       <td className="p-8 text-center"><span className={`px-4 py-1.5 rounded-full text-[9px] font-black border uppercase shadow-sm ${t.status === 'BOOKED' ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-green-50 border-green-100 text-green-600'}`}>{t.status}</span></td>
                     </tr>
                   ))}
                   {activeBookings.length === 0 && <tr><td colSpan={6} className="p-48 text-center text-slate-200 font-black uppercase italic tracking-[0.3em]">No dispatch logs found</td></tr>}
@@ -162,8 +177,8 @@ const TravelModule: React.FC<TravelModuleProps> = ({ guests, bookings, rooms, se
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
            <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
               <div className="bg-blue-900 p-10 text-white flex justify-between items-center">
-                 <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Transport Protocol</h3>
-                 <button onClick={() => setShowForm(false)} className="uppercase text-[10px] font-black opacity-60 hover:opacity-100 transition-opacity">Dismiss</button>
+                 <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Dispatch Authorization</h3>
+                 <button onClick={() => setShowForm(false)} className="uppercase text-[10px] font-black opacity-60">Dismiss</button>
               </div>
               <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
                  <div className="space-y-6">
@@ -171,64 +186,46 @@ const TravelModule: React.FC<TravelModuleProps> = ({ guests, bookings, rooms, se
                     <div className="space-y-3">
                        <div className="flex items-center gap-2 bg-slate-100 rounded-xl border px-3">
                           <span className="text-xs">🔍</span>
-                          <input type="text" placeholder="Search Resident Room / Name..." className="w-full p-3 text-[11px] font-black uppercase outline-none bg-transparent text-black" value={guestSearch} onChange={e => setGuestSearch(e.target.value)} />
+                          <input type="text" placeholder="Search Resident Room..." className="w-full p-3 text-[11px] font-black uppercase outline-none bg-transparent" value={guestSearch} onChange={e => setGuestSearch(e.target.value)} />
                        </div>
-                       <select className="w-full border-2 p-4 rounded-2xl font-black text-xs bg-white outline-none focus:border-blue-900 transition-all shadow-sm text-black" value={formData.roomBookingId} onChange={e => {
+                       <select className="w-full border-2 p-4 rounded-2xl font-black text-xs bg-white text-black" value={formData.roomBookingId} onChange={e => {
                           const bk = bookings.find(x => x.id === e.target.value);
                           const g = guests.find(x => x.id === bk?.guestId);
                           setFormData({...formData, guestId: g?.id || '', guestName: g?.name || '', roomBookingId: bk?.id});
                        }}>
-                          <option value="">Select Target Resident...</option>
-                          {filteredGuests.map(b => (
-                             <option key={b.id} value={b.id}>ROOM {rooms.find(r => r.id === b.roomId)?.number} - {guests.find(g => g.id === b.guestId)?.name}</option>
-                          ))}
+                          <option value="">Choose Resident Folio...</option>
+                          {filteredGuests.map(b => <option key={b.id} value={b.id}>ROOM {rooms.find(r => r.id === b.roomId)?.number} - {guests.find(g => g.id === b.guestId)?.name}</option>)}
                        </select>
-                       {!formData.roomBookingId && (
-                         <div className="space-y-2">
-                           <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 py-2 rounded-lg text-center px-4">Walking-in Guest? Enter name below</p>
-                           <Inp label="Standalone Guest Name" value={formData.guestName} onChange={(v: string) => setFormData({...formData, guestName: v})} />
-                         </div>
-                       )}
+                       {!formData.roomBookingId && <Inp label="Standalone Guest Name" value={formData.guestName} onChange={(v: string) => setFormData({...formData, guestName: v})} />}
                     </div>
-                    <div className="grid grid-cols-2 gap-4 pt-4">
+                    <div className="grid grid-cols-2 gap-4">
                        <Inp label="Driver Name" value={formData.driverName} onChange={(v: string) => setFormData({...formData, driverName: v})} />
-                       <Inp label="Plate Number" value={formData.vehicleNumber} onChange={(v: string) => setFormData({...formData, vehicleNumber: v})} />
+                       <Inp label="Vehicle Plate" value={formData.vehicleNumber} onChange={(v: string) => setFormData({...formData, vehicleNumber: v})} />
                     </div>
-                    <div className="space-y-1">
-                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Fleet Category</label>
-                       <select className="w-full border-2 p-4 rounded-2xl font-black text-xs bg-slate-50 outline-none text-black" value={formData.vehicleType} onChange={e => setFormData({...formData, vehicleType: e.target.value})}>
-                          <option value="Sedan">Sedan (Executive)</option>
-                          <option value="SUV">SUV (Adventure/Family)</option>
-                          <option value="Luxury">Luxury (Premium)</option>
-                          <option value="Bus">Bus / Traveler</option>
-                       </select>
+                    <div className="p-6 bg-blue-50 border rounded-3xl space-y-4">
+                        <label className="flex items-center justify-between cursor-pointer">
+                           <div className="space-y-0.5"><span className="text-[10px] font-black uppercase block text-blue-900">Instant Payment Received</span><span className="text-[8px] font-bold text-blue-400 uppercase">Paid directly at desk</span></div>
+                           <input type="checkbox" checked={formData.instantPaid} onChange={e => setFormData({...formData, instantPaid: e.target.checked})} className="w-6 h-6 rounded-xl" />
+                        </label>
+                        {formData.instantPaid && (
+                          <select className="w-full border p-2 rounded-lg text-[10px] font-black" value={formData.paymentMode} onChange={e => setFormData({...formData, paymentMode: e.target.value})}>
+                            <option value="Cash">Cash</option><option value="UPI">Digital UPI</option><option value="Card">Bank Card</option>
+                          </select>
+                        )}
                     </div>
                  </div>
                  <div className="space-y-6">
-                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest border-b pb-4">Fare & Logic</h4>
+                    <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest border-b pb-4">Fare & Routes</h4>
                     <div className="grid grid-cols-2 gap-4">
-                       <Inp label="Pickup At" value={formData.pickupLocation} onChange={(v: string) => setFormData({...formData, pickupLocation: v})} />
+                       <Inp label="Departure" value={formData.pickupLocation} onChange={(v: string) => setFormData({...formData, pickupLocation: v})} />
                        <Inp label="Destination" value={formData.dropLocation} onChange={(v: string) => setFormData({...formData, dropLocation: v})} />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                       <Inp label="Distance (KM)" type="number" value={formData.kmUsed?.toString()} onChange={(v: string) => setFormData({...formData, kmUsed: parseFloat(v)})} />
+                       <Inp label="KM" type="number" value={formData.kmUsed?.toString()} onChange={(v: string) => setFormData({...formData, kmUsed: parseFloat(v)})} />
                        <Inp label="Days" type="number" value={formData.daysOfTravelling?.toString()} onChange={(v: string) => setFormData({...formData, daysOfTravelling: parseInt(v)})} />
-                       <Inp label="Net Fare (₹)" type="number" value={formData.amount?.toString()} onChange={(v: string) => setFormData({...formData, amount: parseFloat(v)})} />
+                       <Inp label="Fare (₹)" type="number" value={formData.amount?.toString()} onChange={(v: string) => setFormData({...formData, amount: parseFloat(v)})} />
                     </div>
-                    <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100 flex items-center justify-between shadow-inner">
-                       <div className="space-y-1">
-                          <p className="text-[10px] font-black uppercase text-blue-900">Auto-Folio Transfer</p>
-                          <p className="text-[9px] font-bold text-blue-400 uppercase leading-none">{formData.roomBookingId ? 'Link established with guest room' : 'Standalone billing'}</p>
-                       </div>
-                       <input type="checkbox" checked={!!formData.roomBookingId} readOnly className="w-6 h-6 rounded-full text-blue-900 border-2" />
-                    </div>
-                    <button 
-                      onClick={handleSaveTravel} 
-                      disabled={isProcessing}
-                      className={`w-full ${isProcessing ? 'bg-slate-400' : 'bg-blue-900'} text-white py-6 rounded-3xl font-black uppercase text-xs shadow-2xl hover:bg-black transition-all`}
-                    >
-                      {isProcessing ? 'Processing...' : 'Authorize Dispatch'}
-                    </button>
+                    <button onClick={handleSaveTravel} disabled={isProcessing} className={`w-full ${isProcessing ? 'bg-slate-400' : 'bg-blue-900'} text-white py-6 rounded-3xl font-black uppercase text-xs shadow-xl transition-all`}>Authorize Dispatch</button>
                  </div>
               </div>
            </div>
@@ -240,8 +237,8 @@ const TravelModule: React.FC<TravelModuleProps> = ({ guests, bookings, rooms, se
 
 const Inp = ({ label, value, onChange, type = "text" }: any) => (
   <div className="space-y-1 w-full text-left">
-    <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">{label}</label>
-    <input type={type} className="w-full border-2 p-4 rounded-2xl font-black text-[12px] bg-slate-50 outline-none focus:bg-white focus:border-blue-500 transition-all text-black" value={value || ''} onChange={e => onChange(e.target.value)} />
+    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">{label}</label>
+    <input type={type} className="w-full border-2 p-4 rounded-2xl font-black text-[12px] bg-slate-50 text-black" value={value || ''} onChange={e => onChange(e.target.value)} />
   </div>
 );
 
