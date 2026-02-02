@@ -1,6 +1,5 @@
-
 -- HOTEL SPHERE PRO: COMPREHENSIVE MASTER DATABASE SETUP
--- VERSION: 5.3.1 (Fix: Room Deletion Cascade)
+-- VERSION: 5.4.0 (Fix: Schema Mismatch & Missing Columns)
 -- TARGET: SUPABASE POSTGRESQL
 
 -- 1. PROPERTY BLUEPRINT
@@ -13,7 +12,9 @@ CREATE TABLE IF NOT EXISTS rooms (
     price NUMERIC NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'VACANT',
     "currentBookingId" TEXT,
-    "bedType" TEXT DEFAULT 'Double Bed'
+    "bedType" TEXT DEFAULT 'Double Bed',
+    "defaultMealPlan" TEXT,
+    "mealPlanRate" NUMERIC DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS guests (
@@ -52,7 +53,7 @@ CREATE TABLE IF NOT EXISTS guests (
     "visaDateOfExpiry" TEXT
 );
 
--- 2. OPERATIONAL FLOW (Enhanced with Cascade Delete)
+-- 2. OPERATIONAL FLOW
 CREATE TABLE IF NOT EXISTS bookings (
     id TEXT PRIMARY KEY,
     "bookingNo" TEXT NOT NULL,
@@ -120,16 +121,6 @@ CREATE TABLE IF NOT EXISTS payroll (
     "paymentMethod" TEXT
 );
 
-CREATE TABLE IF NOT EXISTS leave_requests (
-    id TEXT PRIMARY KEY,
-    "staffId" TEXT REFERENCES supervisors(id),
-    "startDate" DATE NOT NULL,
-    "endDate" DATE NOT NULL,
-    type TEXT DEFAULT 'CL',
-    reason TEXT,
-    status TEXT DEFAULT 'PENDING'
-);
-
 -- 4. FINANCIAL LEDGERS
 CREATE TABLE IF NOT EXISTS transactions (
     id TEXT PRIMARY KEY,
@@ -192,122 +183,7 @@ CREATE TABLE IF NOT EXISTS catering_menu (
     ingredients JSONB DEFAULT '[]'::jsonb
 );
 
--- 6. DINING POS
-CREATE TABLE IF NOT EXISTS restaurants (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    type TEXT DEFAULT 'FineDine'
-);
-
-CREATE TABLE IF NOT EXISTS menu_items (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL,
-    subcategory TEXT,
-    price NUMERIC NOT NULL DEFAULT 0,
-    "outletId" TEXT REFERENCES restaurants(id),
-    "isAvailable" BOOLEAN DEFAULT TRUE,
-    "dietaryType" TEXT DEFAULT 'VEG'
-);
-
-CREATE TABLE IF NOT EXISTS dining_tables (
-    id TEXT PRIMARY KEY,
-    number TEXT NOT NULL,
-    "outletId" TEXT REFERENCES restaurants(id),
-    status TEXT DEFAULT 'VACANT'
-);
-
-CREATE TABLE IF NOT EXISTS kots (
-    id TEXT PRIMARY KEY,
-    "tableId" TEXT NOT NULL,
-    "outletId" TEXT NOT NULL,
-    "waiterId" TEXT,
-    items JSONB NOT NULL,
-    status TEXT DEFAULT 'PENDING',
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    "bookingId" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS dining_bills (
-    id TEXT PRIMARY KEY,
-    "billNo" TEXT NOT NULL UNIQUE,
-    date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    "outletId" TEXT,
-    "tableNumber" TEXT,
-    items JSONB,
-    "subTotal" NUMERIC,
-    "taxAmount" NUMERIC,
-    "grandTotal" NUMERIC,
-    "paymentMode" TEXT,
-    "guestName" TEXT,
-    "guestPhone" TEXT,
-    "roomBookingId" TEXT
-);
-
--- 7. INVENTORY & LOGISTICS
-CREATE TABLE IF NOT EXISTS inventory (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    category TEXT DEFAULT 'Housekeeping',
-    unit TEXT DEFAULT 'Unit',
-    "currentStock" NUMERIC DEFAULT 0,
-    "minStockLevel" NUMERIC DEFAULT 5,
-    "lastPurchasePrice" NUMERIC DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS vendors (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    contact TEXT NOT NULL,
-    gstin TEXT,
-    category TEXT
-);
-
-CREATE TABLE IF NOT EXISTS stock_receipts (
-    id TEXT PRIMARY KEY,
-    date DATE DEFAULT CURRENT_DATE,
-    "itemId" TEXT REFERENCES inventory(id),
-    "vendorId" TEXT REFERENCES vendors(id),
-    quantity NUMERIC DEFAULT 0,
-    "unitPrice" NUMERIC DEFAULT 0,
-    "totalAmount" NUMERIC DEFAULT 0,
-    "paymentMade" NUMERIC DEFAULT 0,
-    "paymentMode" TEXT,
-    "billNumber" TEXT
-);
-
--- 8. FACILITIES & FLEET
-CREATE TABLE IF NOT EXISTS facility_usage (
-    id TEXT PRIMARY KEY,
-    "facilityId" TEXT NOT NULL,
-    "guestId" TEXT NOT NULL,
-    "startTime" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    "endTime" TIMESTAMP WITH TIME ZONE,
-    amount NUMERIC DEFAULT 0,
-    "isBilledToRoom" BOOLEAN DEFAULT TRUE,
-    "outsiderInfo" JSONB,
-    items JSONB
-);
-
-CREATE TABLE IF NOT EXISTS travel_bookings (
-    id TEXT PRIMARY KEY,
-    "guestId" TEXT,
-    "guestName" TEXT NOT NULL,
-    "vehicleType" TEXT DEFAULT 'Sedan',
-    "vehicleNumber" TEXT,
-    "driverName" TEXT,
-    "pickupLocation" TEXT,
-    "dropLocation" TEXT,
-    date DATE DEFAULT CURRENT_DATE,
-    time TIME DEFAULT CURRENT_TIME,
-    "kmUsed" NUMERIC DEFAULT 0,
-    "daysOfTravelling" INT DEFAULT 1,
-    amount NUMERIC DEFAULT 0,
-    status TEXT DEFAULT 'BOOKED',
-    "roomBookingId" TEXT
-);
-
--- 9. SYSTEM CONFIG
+-- 6. SYSTEM CONFIG (Updated for miscellaneous module storage)
 CREATE TABLE IF NOT EXISTS settings (
     id TEXT PRIMARY KEY DEFAULT 'primary',
     name TEXT NOT NULL DEFAULT 'Hotel Sphere Pro',
@@ -315,6 +191,7 @@ CREATE TABLE IF NOT EXISTS settings (
     agents JSONB DEFAULT '[]'::jsonb,
     "roomTypes" JSONB DEFAULT '[]'::jsonb,
     "mealPlans" JSONB DEFAULT '[]'::jsonb,
+    "mealPlanRates" JSONB DEFAULT '[]'::jsonb,
     floors JSONB DEFAULT '[]'::jsonb,
     blocks JSONB DEFAULT '[]'::jsonb,
     "taxRate" NUMERIC DEFAULT 12,
@@ -328,29 +205,9 @@ CREATE TABLE IF NOT EXISTS settings (
     "receptionistPassword" TEXT DEFAULT 'admin',
     "accountantPassword" TEXT DEFAULT 'admin',
     "supervisorPassword" TEXT DEFAULT 'admin',
-    "cgstRate" NUMERIC,
-    "sgstRate" NUMERIC,
-    "igstRate" NUMERIC,
-    "epfRateEmployee" NUMERIC DEFAULT 12,
-    "epfRateEmployer" NUMERIC DEFAULT 12,
-    "esiRateEmployee" NUMERIC DEFAULT 0.75,
-    "esiRateEmployer" NUMERIC DEFAULT 3.25
+    "list" JSONB, -- For module collections like Facility Packages
+    "config" JSONB -- For module specific configs
 );
 
--- 10. REFRESH & SEED
-INSERT INTO settings (id, name) VALUES ('primary', 'Hotel Sphere Pro') ON CONFLICT (id) DO NOTHING;
-
--- MIGRATION: REFRESH CONSTRAINTS FOR ROOM DELETION
--- This ensures existing deployments allow cascading room deletions
-DO $$ 
-BEGIN 
-    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'bookings_roomId_fkey') THEN
-        ALTER TABLE bookings DROP CONSTRAINT bookings_roomId_fkey;
-    END IF;
-    
-    ALTER TABLE bookings 
-    ADD CONSTRAINT bookings_roomId_fkey 
-    FOREIGN KEY ("roomId") REFERENCES rooms(id) ON DELETE CASCADE;
-END $$;
-
+-- REFRESH CACHE
 NOTIFY pgrst, 'reload schema';

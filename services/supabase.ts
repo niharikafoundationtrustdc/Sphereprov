@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // User provided credentials for Project: fejxskvsjfwjqmiobtpp
@@ -18,19 +17,21 @@ export async function pushToCloud(tableName: string, data: any) {
   if (!IS_CLOUD_ENABLED || !navigator.onLine) return true;
   try {
     if (!data) return true;
+    
+    // Clean data for Supabase (remove Dexie internal keys if any)
     const payload = Array.isArray(data) ? data : [data];
     if (payload.length === 0) return true;
     
-    // Remote upsert handles insert/update automatically
+    // Remote upsert handles insert/update automatically based on 'id'
     const { error } = await supabase.from(tableName).upsert(payload, { onConflict: 'id' });
+    
     if (error) {
-      // Log as warning rather than error to avoid confusing console traces for end users
-      // Schema mismatches (like missing bedType) are caught here.
-      console.warn(`Cloud Sync Issue [${tableName}]: ${error.message}. This usually means the remote database schema needs an update.`);
+      console.warn(`Cloud Sync Issue [${tableName}]: ${error.message}`);
       return false;
     }
     return true;
   } catch (err) {
+    console.error("Critical Sync Failure:", err);
     return false;
   }
 }
@@ -61,6 +62,20 @@ export function subscribeToTable(tableName: string, onUpdate: (payload: any) => 
   if (!IS_CLOUD_ENABLED) return { unsubscribe: () => {} };
   return supabase
     .channel(`${tableName}-global-sync`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, onUpdate)
+    .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, (payload) => {
+      onUpdate(payload);
+    })
     .subscribe();
+}
+
+/**
+ * Checks if the Supabase connection is currently reachable
+ */
+export async function checkCloudHealth(): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('settings').select('id').limit(1);
+    return !error;
+  } catch {
+    return false;
+  }
 }

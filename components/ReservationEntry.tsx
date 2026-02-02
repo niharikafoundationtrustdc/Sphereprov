@@ -36,6 +36,7 @@ const ReservationEntry: React.FC<ReservationEntryProps> = ({ onClose, existingGu
   const [advanceMethod, setAdvanceMethod] = useState('Cash');
   const [discount, setDiscount] = useState('0');
   const [mealPlan, setMealPlan] = useState('EP (Room Only)');
+  const [mealRate, setMealRate] = useState(0);
   const [bookingAgent, setBookingAgent] = useState('Direct');
   
   const [showSecondary, setShowSecondary] = useState(false);
@@ -105,8 +106,21 @@ const ReservationEntry: React.FC<ReservationEntryProps> = ({ onClose, existingGu
     if (!mobileNo || !guestName || selectedRoomIds.length === 0) return alert("Fill mandatory fields and select a room.");
     const initialPayments = parseFloat(advanceAmount) > 0 ? [{ id: 'ADV-' + Date.now(), amount: parseFloat(advanceAmount), date: new Date().toISOString(), method: advanceMethod, remarks: 'Advance during reservation' }] : [];
     const sessionGroupId = selectedRoomIds.length > 1 ? 'GRP-' + Math.random().toString(36).substr(2, 6).toUpperCase() : undefined;
+    
+    const start = new Date(checkInDate);
+    const end = new Date(checkOutDate);
+    const nights = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000)) || 1;
+    const totalHeads = parseInt(adults) + parseInt(children) + (secondaryGuest.name ? 1 : 0);
+
     const bookings = selectedRoomIds.map(roomId => {
       const r = rooms.find(x => x.id === roomId);
+      const mealCharges = mealRate > 0 ? [{ 
+        id: `MEAL-RES-${Date.now()}`, 
+        description: `Plan: ${mealPlan}`, 
+        amount: (mealRate * totalHeads * nights), 
+        date: new Date().toISOString() 
+      }] : [];
+
       return {
         bookingNo: 'RES-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
         roomId: roomId,
@@ -118,7 +132,8 @@ const ReservationEntry: React.FC<ReservationEntryProps> = ({ onClose, existingGu
         mealPlan,
         agent: bookingAgent,
         adults: parseInt(adults), children: parseInt(children), kids: parseInt(kids), others: parseInt(others),
-        charges: [], payments: initialPayments,
+        charges: mealCharges, 
+        payments: initialPayments,
         secondaryGuest: secondaryGuest.name ? secondaryGuest : undefined,
         purpose: purpose
       };
@@ -153,6 +168,7 @@ const ReservationEntry: React.FC<ReservationEntryProps> = ({ onClose, existingGu
             </div>
             <Inp label="WhatsApp / Phone (CRM)*" value={mobileNo} onChange={handlePhoneChange} placeholder="99XXXXXXX" />
             <Inp label="Guest Display Name *" value={guestName} onChange={setGuestName} />
+            
             <div className="grid grid-cols-2 gap-3">
                <div className="space-y-1">
                  <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Gender</label>
@@ -164,6 +180,27 @@ const ReservationEntry: React.FC<ReservationEntryProps> = ({ onClose, existingGu
                <Inp label="Nationality" value={nationality} onChange={setNationality} />
             </div>
             <Inp label="City / Region" value={city} onChange={setCity} />
+
+            <div className="pt-4 border-t border-slate-200">
+               <SectionHeader title="Service Plan" />
+               <div className="grid grid-cols-1 gap-4 mt-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Meal Plan (Master)</label>
+                    <select 
+                      className="w-full border-2 p-3 rounded-xl text-[11px] font-black bg-white text-slate-900 outline-none focus:border-orange-500" 
+                      value={mealPlan} 
+                      onChange={e => {
+                        const plan = settings.mealPlanRates.find(p => p.name === e.target.value);
+                        setMealPlan(e.target.value);
+                        setMealRate(plan?.rate || 0);
+                      }}
+                    >
+                      {settings.mealPlans.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <Inp label="Auto-Fetched Rate (₹)" type="number" value={mealRate.toString()} onChange={(v: string) => setMealRate(parseFloat(v) || 0)} />
+               </div>
+            </div>
           </div>
 
           <div className="flex-1 p-4 md:p-10 space-y-8 overflow-y-auto custom-scrollbar bg-white">

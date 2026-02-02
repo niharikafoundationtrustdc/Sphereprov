@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { HostelSettings, Room, RoomStatus } from '../types.ts';
 import { exportDatabase, importDatabase } from '../services/db.ts';
@@ -40,7 +39,7 @@ const SuperAdminPanel: React.FC<SuperAdminPanelProps> = ({ settings, setSettings
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-slate-900 flex flex-col animate-in fade-in duration-300 overflow-hidden">
+    <div className="fixed inset-0 z-[200] bg-slate-900 flex flex-col animate-in fade-in duration-300 overflow-hidden text-white">
       {/* Super Header */}
       <header className="bg-black p-8 flex justify-between items-center border-b border-white/10">
         <div className="flex items-center gap-6">
@@ -54,7 +53,7 @@ const SuperAdminPanel: React.FC<SuperAdminPanelProps> = ({ settings, setSettings
           <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-black text-2xl font-black shadow-2xl">SA</div>
           <div>
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter leading-none">Superadmin Command Center</h1>
-            <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-1">System Master Authority Protocol v3.4.0</p>
+            <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-1">System Master Authority Protocol v5.4.0</p>
           </div>
         </div>
         <button onClick={onClose} className="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs transition-all border border-white/10">Exit Command Center</button>
@@ -96,7 +95,7 @@ const SuperAdminPanel: React.FC<SuperAdminPanelProps> = ({ settings, setSettings
                 <div className="p-8 bg-blue-900/10 border border-blue-900/30 rounded-[3rem] space-y-4">
                    <h3 className="font-black text-blue-400 uppercase text-xs tracking-widest">Master Override Info</h3>
                    <p className="text-xs text-white/70 font-medium leading-relaxed">
-                     The system-wide master password is now set to "admin" for all portals as per enterprise policy. Individual staff passwords can be managed in the staff roster under standard Admin settings.
+                     Individual staff passwords can be managed in the staff roster under standard Admin settings.
                    </p>
                 </div>
              </div>
@@ -154,18 +153,18 @@ const SuperAdminPanel: React.FC<SuperAdminPanelProps> = ({ settings, setSettings
                    <h2 className="text-3xl font-black text-white uppercase tracking-tighter">System Operations</h2>
                    <div className="grid grid-cols-2 gap-8">
                       <div className="bg-black/40 p-10 rounded-[3rem] border border-white/5 space-y-6">
-                         <h3 className="font-black text-white uppercase text-xs tracking-widest">Local Storage (Dexie)</h3>
+                         <h3 className="font-black text-white uppercase text-xs tracking-widest">Local Cache (Dexie)</h3>
                          <div className="flex justify-between items-center text-xs font-bold text-white/50 uppercase">
                             <span>Status</span>
                             <span className="text-green-500">Optimal</span>
                          </div>
-                         <button onClick={exportDatabase} className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase text-[10px] shadow-2xl">Download DB Export</button>
+                         <button onClick={exportDatabase} className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase text-[10px] shadow-2xl">Download Master JSON</button>
                       </div>
                       <div className="bg-black/40 p-10 rounded-[3rem] border border-white/5 space-y-6">
-                         <h3 className="font-black text-white uppercase text-xs tracking-widest">Database Recovery</h3>
-                         <p className="text-[10px] text-white/40 font-bold uppercase leading-relaxed">Restore from a previously exported JSON backup file.</p>
+                         <h3 className="font-black text-white uppercase text-xs tracking-widest">Recovery Protocol</h3>
+                         <p className="text-[10px] text-white/40 font-bold uppercase leading-relaxed">Restore from JSON backup file.</p>
                          <div className="relative">
-                            <button className="w-full bg-blue-900 text-white py-4 rounded-2xl font-black uppercase text-[10px]">Upload Backup File</button>
+                            <button className="w-full bg-blue-900 text-white py-4 rounded-2xl font-black uppercase text-[10px]">Upload Backup</button>
                             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImport} />
                          </div>
                       </div>
@@ -174,51 +173,37 @@ const SuperAdminPanel: React.FC<SuperAdminPanelProps> = ({ settings, setSettings
                 
                 <section className="bg-black/60 p-12 rounded-[4rem] border border-blue-900/30 space-y-8">
                    <div className="flex items-center gap-6">
-                      <div className="text-4xl">⚡</div>
+                      <div className="text-4xl">🛠️</div>
                       <div>
-                         <h3 className="text-xl font-black text-white uppercase tracking-tight">Master Cloud Schema Setup</h3>
-                         <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Full SQL Table Construction Script</p>
+                         <h3 className="text-xl font-black text-white uppercase tracking-tight">Sync Error Resolution Script</h3>
+                         <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Run this in Supabase SQL Editor to clear "Missing Column" warnings</p>
                       </div>
                    </div>
-                   <div className="bg-slate-900 p-8 rounded-3xl border border-white/5 font-mono text-[9px] text-blue-300 leading-relaxed overflow-x-auto h-80 overflow-y-auto custom-scrollbar">
-{`-- FIXED: Ensure 'bedType' and other columns exist --
-ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "bedType" TEXT DEFAULT 'Double Bed';
-ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "defaultMealPlan" TEXT;
-ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "mealPlanRate" NUMERIC DEFAULT 0;
+                   <div className="bg-slate-900 p-8 rounded-3xl border border-white/5 font-mono text-[10px] text-emerald-400 leading-relaxed overflow-x-auto h-96 overflow-y-auto custom-scrollbar">
+{`-- RESOLVE: Missing Column 'bedType' and 'list'
+-- Execute this script in Supabase -> SQL Editor
 
--- ENSURE ALL OTHER COLUMNS (FIX FOR SCHEMA MISMATCH) --
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "surName" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "givenName" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "gender" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "dob" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "country" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "gstin" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "passportNo" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "passportPlaceOfIssue" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "passportDateOfIssue" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "passportDateOfExpiry" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "visaNo" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "visaType" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "visaPlaceOfIssue" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "visaDateOfIssue" TEXT;
-ALTER TABLE guests ADD COLUMN IF NOT EXISTS "visaDateOfExpiry" TEXT;
+ALTER TABLE rooms 
+ADD COLUMN IF NOT EXISTS "bedType" TEXT DEFAULT 'Double Bed',
+ADD COLUMN IF NOT EXISTS "defaultMealPlan" TEXT,
+ADD COLUMN IF NOT EXISTS "mealPlanRate" NUMERIC DEFAULT 0;
 
-ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "secondaryGuest" JSONB;
+ALTER TABLE settings 
+ADD COLUMN IF NOT EXISTS "list" JSONB,
+ADD COLUMN IF NOT EXISTS "config" JSONB,
+ADD COLUMN IF NOT EXISTS "mealPlanRates" JSONB DEFAULT '[]'::jsonb;
 
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "logo" TEXT;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "signature" TEXT;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "gstNumber" TEXT;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "taxRate" NUMERIC;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "cgstRate" NUMERIC;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "sgstRate" NUMERIC;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "igstRate" NUMERIC;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "hsnCode" TEXT;
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS "upiId" TEXT;
+ALTER TABLE event_bookings
+ADD COLUMN IF NOT EXISTS "catering" JSONB,
+ADD COLUMN IF NOT EXISTS "guestCount" INT DEFAULT 50;
 
--- REFRESH CACHE
+ALTER TABLE supervisors
+ADD COLUMN IF NOT EXISTS "assignedRoomIds" JSONB DEFAULT '[]'::jsonb;
+
+-- FORCE REFRESH SCHEMA CACHE
 NOTIFY pgrst, 'reload schema';`}
                    </div>
-                   <p className="text-[10px] text-white/30 font-bold uppercase text-center italic">Run the above SQL in the Supabase Dashboard SQL Editor to resolve "Could not find column" errors.</p>
+                   <p className="text-[10px] text-white/30 font-bold uppercase text-center italic">Run the above code to immediately resolve all "Cloud Sync Issue" warnings.</p>
                 </section>
              </div>
            )}
@@ -236,7 +221,7 @@ const NavTab = ({ active, label, icon, onClick }: any) => (
 );
 
 const PassCard = ({ role, value, onChange }: any) => (
-  <div className="bg-black/40 p-8 rounded-[2.5rem] border border-white/5 group hover:border-blue-500/50 transition-all">
+  <div className="bg-black/40 p-8 rounded-[2.5rem] border border-white/5 group hover:border-blue-500/50 transition-all text-white">
     <label className="text-[9px] font-black uppercase text-blue-400 tracking-widest block mb-4">{role}</label>
     <input 
       type="text" 

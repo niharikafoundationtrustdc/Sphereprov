@@ -108,7 +108,6 @@ const Settings: React.FC<SettingsProps> = ({
     const room = rooms.find(r => r.id === id);
     if (!room) return;
 
-    // Safety guard: prevent deletion of occupied rooms
     if (room.status === RoomStatus.OCCUPIED) {
       alert("Operational Conflict: Cannot delete a room that is currently OCCUPIED. Please check out the guest first.");
       return;
@@ -117,14 +116,9 @@ const Settings: React.FC<SettingsProps> = ({
     if (!window.confirm(`DANGER: Permanently delete unit ${room.number}? This will also remove all associated historical bookings from the cloud. This action cannot be undone. Proceed?`)) return;
 
     try {
-      // 1. Delete from local database (Dexie)
-      // This will trigger the Dexie hook to call Supabase removeFromCloud
       await db.rooms.delete(id);
-      
-      // 2. Update React state for instant feedback
       const updatedRooms = rooms.filter(r => r.id !== id);
       setRooms(updatedRooms);
-      
       alert(`Unit ${room.number} permanently removed from inventory.`);
     } catch (err) {
       console.error("Room Deletion Failure:", err);
@@ -133,7 +127,7 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const handleStaffSave = async () => {
-    if (!editingStaff?.name || !editingStaff?.loginId) return;
+    if (!editingStaff?.name || !editingStaff?.loginId) return alert("Missing mandatory fields.");
     const staffObj: Supervisor = {
       ...editingStaff as Supervisor,
       id: editingStaff.id || `STF-${Date.now()}`,
@@ -145,6 +139,15 @@ const Settings: React.FC<SettingsProps> = ({
     setSupervisors(nextList);
     setShowStaffModal(false);
     setEditingStaff(null);
+  };
+
+  const toggleStaffRoom = (roomId: string) => {
+    if (!editingStaff) return;
+    const current = editingStaff.assignedRoomIds || [];
+    const next = current.includes(roomId) 
+      ? current.filter(id => id !== roomId) 
+      : [...current, roomId];
+    setEditingStaff({ ...editingStaff, assignedRoomIds: next });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, key: 'logo' | 'signature' | 'wallpaper') => {
@@ -254,7 +257,7 @@ const Settings: React.FC<SettingsProps> = ({
           <div className="space-y-8 animate-in fade-in">
              <div className="flex justify-between items-center">
                 <h3 className="text-xl font-black text-blue-900 uppercase">Personnel Registry</h3>
-                <button onClick={() => { setEditingStaff({ role: 'RECEPTIONIST', status: 'ACTIVE' }); setShowStaffModal(true); }} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg">+ Register Staff</button>
+                <button onClick={() => { setEditingStaff({ role: 'RECEPTIONIST', status: 'ACTIVE', assignedRoomIds: [] }); setShowStaffModal(true); }} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg">+ Register Staff</button>
              </div>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {supervisors.map(s => (
@@ -266,9 +269,10 @@ const Settings: React.FC<SettingsProps> = ({
                         </div>
                         <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none">{s.name}</h4>
                         <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 tracking-widest">{s.role}</p>
+                        <p className="text-[8px] font-black uppercase text-blue-500 mt-4 tracking-widest">Assigned: {s.assignedRoomIds?.length || 0} Units</p>
                      </div>
                      <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between items-center">
-                        <button onClick={() => { setEditingStaff(s); setShowStaffModal(true); }} className="text-blue-600 font-black text-[10px] uppercase">Edit Profile</button>
+                        <button onClick={() => { setEditingStaff(s); setShowStaffModal(true); }} className="text-blue-600 font-black text-[10px] uppercase">Edit Profile & Assets</button>
                         <button onClick={async (e) => { e.stopPropagation(); if(window.confirm('Wipe personnel?')) { await db.supervisors.delete(s.id); setSupervisors(supervisors.filter(x => x.id !== s.id)); }}} className="text-red-400 font-black text-[10px] uppercase">Delete</button>
                      </div>
                   </div>
@@ -338,7 +342,7 @@ const Settings: React.FC<SettingsProps> = ({
                         <th className="p-6 text-center">Action</th>
                       </tr>
                    </thead>
-                   <tbody className="divide-y divide-slate-100 font-bold uppercase text-slate-700">
+                   <tbody className="divide-y divide-slate-100 font-bold uppercase text-slate-700 bg-white">
                       {[...rooms].sort((a,b) => a.number.localeCompare(b.number, undefined, {numeric:true})).map(r => (
                         <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                            <td className="p-6 text-lg font-black text-slate-900">{r.number} <span className="text-[8px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded ml-2">{r.block}</span></td>
@@ -363,29 +367,49 @@ const Settings: React.FC<SettingsProps> = ({
 
       {showStaffModal && editingStaff && (
         <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4">
-           <div className="bg-white w-full max-w-md rounded-[3rem] shadow-3xl animate-in zoom-in">
-              <div className="bg-blue-900 p-8 text-white rounded-t-[3rem] flex justify-between items-center">
-                 <h3 className="text-xl font-black uppercase tracking-tighter">Personnel Profile</h3>
+           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-3xl animate-in zoom-in flex flex-col max-h-[90vh]">
+              <div className="bg-blue-900 p-8 text-white rounded-t-[3rem] flex justify-between items-center shrink-0">
+                 <h3 className="text-xl font-black uppercase tracking-tighter">Personnel Profile & Asset Rights</h3>
                  <button onClick={() => setShowStaffModal(false)} className="text-[10px] font-black opacity-60">Cancel</button>
               </div>
-              <div className="p-10 space-y-6">
-                 <Inp label="Legal Name" value={editingStaff.name} onChange={v => setEditingStaff({...editingStaff, name: v})} />
+              <div className="p-10 space-y-8 overflow-y-auto custom-scrollbar flex-1">
+                 <div className="grid grid-cols-2 gap-4">
+                    <Inp label="Legal Name" value={editingStaff.name} onChange={v => setEditingStaff({...editingStaff, name: v})} />
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Functional Role</label>
+                       <select className="w-full bg-white border border-slate-200 p-4 rounded-xl font-bold text-xs text-slate-900" value={editingStaff.role} onChange={e => setEditingStaff({...editingStaff, role: e.target.value as any})}>
+                          <option value="RECEPTIONIST">Reception Desk</option>
+                          <option value="MANAGER">Management</option>
+                          <option value="SUPERVISOR">Housekeeping</option>
+                          <option value="CHEF">Kitchen</option>
+                          <option value="WAITER">Service</option>
+                          <option value="ACCOUNTANT">Audit</option>
+                       </select>
+                    </div>
+                 </div>
                  <div className="grid grid-cols-2 gap-4">
                     <Inp label="Module Login ID" value={editingStaff.loginId} onChange={v => setEditingStaff({...editingStaff, loginId: v})} />
                     <Inp label="Module Password" type="password" value={editingStaff.password} onChange={v => setEditingStaff({...editingStaff, password: v})} />
                  </div>
-                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Functional Role</label>
-                    <select className="w-full bg-white border border-slate-200 p-4 rounded-xl font-bold text-xs text-slate-900" value={editingStaff.role} onChange={e => setEditingStaff({...editingStaff, role: e.target.value as any})}>
-                       <option value="RECEPTIONIST">Reception Desk</option>
-                       <option value="MANAGER">Management</option>
-                       <option value="SUPERVISOR">Housekeeping</option>
-                       <option value="CHEF">Kitchen</option>
-                       <option value="WAITER">Service</option>
-                       <option value="ACCOUNTANT">Audit</option>
-                    </select>
+
+                 <div className="space-y-4 pt-4 border-t">
+                    <h4 className="text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]">Assign Units for Oversight</h4>
+                    <p className="text-[9px] text-slate-400 uppercase font-bold italic">Staff will only see these units in their maintenance dashboard</p>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 max-h-[300px] overflow-y-auto p-2 bg-slate-50 rounded-2xl border custom-scrollbar">
+                       {[...rooms].sort((a,b) => a.number.localeCompare(b.number, undefined, {numeric: true})).map(r => (
+                          <button 
+                            key={r.id} 
+                            onClick={() => toggleStaffRoom(r.id)}
+                            className={`p-3 rounded-xl border-2 font-black text-[10px] transition-all ${editingStaff.assignedRoomIds?.includes(r.id) ? 'bg-blue-600 border-blue-600 text-white shadow-md scale-105' : 'bg-white border-white text-slate-400 hover:border-blue-100'}`}
+                          >
+                             {r.number}
+                          </button>
+                       ))}
+                    </div>
                  </div>
-                 <button onClick={handleStaffSave} className="w-full bg-blue-900 text-white py-5 rounded-[1.5rem] font-black uppercase text-xs shadow-xl">Commit Personnel Node</button>
+              </div>
+              <div className="p-8 bg-slate-50 border-t shrink-0">
+                 <button onClick={handleStaffSave} className="w-full bg-blue-900 text-white py-5 rounded-[1.5rem] font-black uppercase text-xs shadow-xl hover:bg-black transition-all">Authorize Personnel Data Update</button>
               </div>
            </div>
         </div>

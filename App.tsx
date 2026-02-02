@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Room, RoomStatus, Guest, Booking, HostelSettings, Transaction, GroupProfile, UserRole, Supervisor, Quotation, RoomShiftLog } from './types.ts';
 import { INITIAL_ROOMS, STATUS_COLORS } from './constants.tsx';
 import { db, exportDatabase } from './services/db.ts';
-import { pullFromCloud, subscribeToTable, IS_CLOUD_ENABLED } from './services/supabase.ts';
+import { pullFromCloud, subscribeToTable, IS_CLOUD_ENABLED, checkCloudHealth } from './services/supabase.ts';
 import GuestCheckin from './components/GuestCheckin.tsx';
 import StayManagement from './components/StayManagement.tsx';
 import Reports from './components/Reports.tsx';
@@ -71,6 +71,7 @@ const App: React.FC = () => {
   const [showGlobalArchive, setShowGlobalArchive] = useState(false);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set());
+  const [isCloudLive, setIsCloudLive] = useState(false);
 
   const roomsWithEffectiveStatus = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -129,12 +130,20 @@ const App: React.FC = () => {
     const init = async () => {
       try {
         if (IS_CLOUD_ENABLED) {
+          const cloudOk = await checkCloudHealth();
+          setIsCloudLive(cloudOk);
+
           const tables = ['rooms', 'guests', 'bookings', 'transactions', 'groups', 'supervisors', 'settings'];
           for (const table of tables) {
             const cloudData = await pullFromCloud(table);
             if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) { 
               await (db as any)[table].bulkPut(cloudData); 
             }
+            // Subscribe to real-time changes
+            subscribeToTable(table, () => {
+              console.debug(`Remote change detected on ${table}. Refreshing...`);
+              refreshLocalState();
+            });
           }
         }
         const existingRooms = await db.rooms.toArray();
@@ -144,6 +153,16 @@ const App: React.FC = () => {
       setIsLoading(false);
     };
     init();
+
+    // Periodic cloud health check
+    const healthInterval = setInterval(async () => {
+      if (IS_CLOUD_ENABLED) {
+        const ok = await checkCloudHealth();
+        setIsCloudLive(ok);
+      }
+    }, 30000);
+
+    return () => clearInterval(healthInterval);
   }, [refreshLocalState]);
 
   const handleLogin = (role: UserRole, supervisor?: Supervisor) => {
@@ -265,7 +284,10 @@ const App: React.FC = () => {
                <div className="flex flex-col gap-1 text-center md:text-left">
                  <h1 className="text-3xl md:text-5xl font-black text-emerald-900 uppercase tracking-tighter leading-none">{settings.name}</h1>
                  <div className="flex items-center gap-3 mt-1">
-                    <p className="text-[10px] md:text-[12px] font-black text-lime-600 uppercase tracking-[0.4em]">Live Enterprise Sync Active</p>
+                    <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-full border shadow-sm">
+                       <div className={`w-2 h-2 rounded-full ${isCloudLive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                       <p className="text-[10px] md:text-[12px] font-black text-lime-600 uppercase tracking-[0.4em]">{isCloudLive ? 'Live Enterprise Sync Active' : 'Offline / Syncing...'}</p>
+                    </div>
                     <button 
                       onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedRoomIds(new Set()); }}
                       className={`px-4 py-1.5 rounded-full font-black text-[10px] uppercase border-2 transition-all ${isSelectionMode ? 'bg-orange-600 border-orange-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-400'}`}
