@@ -76,19 +76,20 @@ export class HotelSphereDB extends Dexie {
       const table = (this as any)[tableName];
       if (!table) return;
 
+      // Increased delay to 200ms to allow bulk state updates to settle before cloud push
       table.hook('creating', (primKey: any, obj: any) => {
-        if (IS_CLOUD_ENABLED) setTimeout(() => pushToCloud(tableName, obj), 50);
+        if (IS_CLOUD_ENABLED) setTimeout(() => pushToCloud(tableName, obj), 200);
       });
 
       table.hook('updating', (mods: any, primKey: any, obj: any) => {
         if (IS_CLOUD_ENABLED) {
             const merged = { ...obj, ...mods };
-            setTimeout(() => pushToCloud(tableName, merged), 50);
+            setTimeout(() => pushToCloud(tableName, merged), 200);
         }
       });
 
       table.hook('deleting', (primKey: any) => {
-        if (IS_CLOUD_ENABLED) setTimeout(() => removeFromCloud(tableName, primKey), 50);
+        if (IS_CLOUD_ENABLED) setTimeout(() => removeFromCloud(tableName, primKey), 200);
       });
     });
   }

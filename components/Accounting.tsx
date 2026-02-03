@@ -15,7 +15,7 @@ interface AccountingProps {
 }
 
 const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, bookings, guests, rooms, settings }) => {
-  const [activeTab, setActiveTab] = useState<'ENTRY' | 'LEDGER' | 'CASHBOOK' | 'ARCHIVE'>('ENTRY');
+  const [activeTab, setActiveTab] = useState<'ENTRY' | 'LEDGER' | 'CASHBOOK' | 'CONTRA_REGISTER' | 'ARCHIVE'>('ENTRY');
   const [type, setType] = useState<TransactionType>('RECEIPT');
   const [amount, setAmount] = useState('');
   const [ledger, setLedger] = useState('Cash Account');
@@ -84,6 +84,11 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
     processedTransactions.filter(t => t.ledger.toLowerCase().includes('cash') && t.date >= reportStart && t.date <= reportEnd), 
     [processedTransactions, reportStart, reportEnd]
   );
+
+  const contraOnlyTransactions = useMemo(() => 
+    transactions.filter(t => t.type === 'CONTRA' && t.date >= reportStart && t.date <= reportEnd),
+    [transactions, reportStart, reportEnd]
+  );
   
   const filteredArchive = useMemo(() => {
     if (!archiveSearch) return bookings.slice(-50).reverse();
@@ -100,6 +105,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
         <Tab active={activeTab === 'ENTRY'} onClick={() => setActiveTab('ENTRY')}>New Entry</Tab>
         <Tab active={activeTab === 'LEDGER'} onClick={() => setActiveTab('LEDGER')}>General Ledger</Tab>
         <Tab active={activeTab === 'CASHBOOK'} onClick={() => setActiveTab('CASHBOOK')}>Cash Register</Tab>
+        <Tab active={activeTab === 'CONTRA_REGISTER'} onClick={() => setActiveTab('CONTRA_REGISTER')}>Contra Register</Tab>
         <Tab active={activeTab === 'ARCHIVE'} onClick={() => setActiveTab('ARCHIVE')}>Invoice Archive</Tab>
       </div>
 
@@ -119,7 +125,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
                    <select className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={type} onChange={e => setType(e.target.value as any)}>
                       <option value="RECEIPT">RECEIPT (+)</option>
                       <option value="PAYMENT">PAYMENT (-)</option>
-                      <option value="CONTRA">CONTRA (Transfer)</option>
+                      <option value="CONTRA">CONTRA (F4 Transfer)</option>
                       <option value="JOURNAL">JOURNAL (Adjust)</option>
                    </select>
                 </Field>
@@ -132,12 +138,12 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
                   </Field>
                 )}
 
-                <Field label={type === 'CONTRA' ? "Source Ledger (From)" : "Main Ledger"}>
+                <Field label={type === 'CONTRA' ? "Source Account (Withdraw From Cr)" : "Main Ledger"}>
                    <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={ledger} onChange={e => setLedger(e.target.value)} placeholder="Cash / Bank Account" />
                 </Field>
 
                 {type === 'CONTRA' && (
-                  <Field label="Destination Ledger (To)">
+                  <Field label="Destination Account (Deposit To Dr)">
                     <input className="w-full border-2 border-slate-100 p-4 rounded-2xl font-black text-xs bg-white text-slate-900 outline-none focus:border-blue-900 transition-all shadow-sm" value={toLedger} onChange={e => setToLedger(e.target.value)} placeholder="Destination Bank/Cash" />
                   </Field>
                 )}
@@ -159,6 +165,49 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
                 </div>
              </div>
              <button onClick={handleEntry} className="bg-blue-900 text-white font-black px-12 py-5 rounded-3xl text-xs uppercase shadow-xl tracking-[0.2em] hover:bg-black transition-all">Authorize Posting</button>
+          </div>
+        )}
+
+        {activeTab === 'CONTRA_REGISTER' && (
+          <div className="space-y-10 animate-in fade-in duration-300">
+             <div className="flex justify-between items-end border-b pb-8">
+                <div>
+                   <h2 className="text-3xl font-black text-black uppercase tracking-tighter leading-none">Contra Register</h2>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Internal Cash & Bank Transfers (F4)</p>
+                </div>
+                <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+                   <input type="date" className="bg-white p-2 rounded-xl text-[10px] font-black text-slate-900 outline-none" value={reportStart} onChange={e => setReportStart(e.target.value)} />
+                   <span className="text-xs font-black text-slate-400">TO</span>
+                   <input type="date" className="bg-white p-2 rounded-xl text-[10px] font-black text-slate-900 outline-none" value={reportEnd} onChange={e => setReportEnd(e.target.value)} />
+                </div>
+             </div>
+             <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                   <thead className="bg-indigo-900 text-white font-black uppercase">
+                      <tr>
+                        <th className="p-6">Date</th>
+                        <th className="p-6">From Account (Cr)</th>
+                        <th className="p-6">To Account (Dr)</th>
+                        <th className="p-6">Narration</th>
+                        <th className="p-6 text-right">Amount (₹)</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y font-bold uppercase text-slate-700 bg-white">
+                      {contraOnlyTransactions.map((t, idx) => (
+                        <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
+                           <td className="p-6 opacity-50">{t.date}</td>
+                           <td className="p-6 text-red-600">{t.ledger}</td>
+                           <td className="p-6 text-green-700">{t.toLedger}</td>
+                           <td className="p-6 font-black italic opacity-60 text-[10px]">{t.description}</td>
+                           <td className="p-6 text-right font-black text-indigo-900 text-lg">₹{t.amount.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                      {contraOnlyTransactions.length === 0 && (
+                        <tr><td colSpan={5} className="p-40 text-center text-slate-200 uppercase font-black tracking-[0.4em] italic">No internal transfers recorded in this period</td></tr>
+                      )}
+                   </tbody>
+                </table>
+             </div>
           </div>
         )}
 
@@ -231,7 +280,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, setTransactions, 
                 </div>
              </div>
              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs border-collapse">
                    <thead className="bg-slate-900 text-white font-black uppercase">
                       <tr><th className="p-6">Date</th><th className="p-6">Type</th><th className="p-6">Narration</th><th className="p-6 text-right">Debit (In)</th><th className="p-6 text-right">Credit (Out)</th></tr>
                    </thead>
